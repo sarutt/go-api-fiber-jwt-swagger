@@ -14,8 +14,8 @@ import (
 	_"gitlhub.com/sarutt/apifiber/docs"
 )
 
-// @title Book API
-// @description This is a sample server for a book API.
+// @title Pom Pom Hollow Production API
+// @description Orchestration backend for the automated short-form video pipeline, plus the original book sample endpoints.
 // @version 1.0
 // @host localhost:8080
 // @BasePath /
@@ -48,6 +48,9 @@ if secretKey == "" {
     log.Fatal("SECRET_KEY is not set in .env file")
 }
 
+// Open the pipeline database and seed the show bible on first run
+initDB()
+
 // Login route
 app.Post("/login", login(secretKey))
 
@@ -74,6 +77,9 @@ app.Use(jwtware.New(jwtware.Config{
 app.Post("/upload",uploadFile)
 
 app.Get("/config",getConfig)
+
+// Production pipeline API (registered after the JWT middleware, so protected)
+registerPipelineRoutes(app)
 
   app.Listen(":8080")
 

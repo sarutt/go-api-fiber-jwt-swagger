@@ -1,0 +1,10 @@
+# Pipeline database (created on first run, seeded from the show bible)
+*.db
+*.db-shm
+*.db-wal
+
+# Uploaded files
+/uploads/
+
+# Build output
+/apifiber
