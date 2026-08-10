@@ -25,7 +25,32 @@ file is created and seeded with the show bible on first run.
 Swagger UI: <http://localhost:8080/swagger/index.html>
 Regenerate docs after changing annotations: `swag init`
 
-All `/pipeline/*` routes require a JWT. Get one from `POST /login`.
+Run the tests with `go test ./...`. CI runs build, vet, gofmt and tests on
+every pull request.
+
+## Roles
+
+All `/pipeline/*` routes require a JWT from `POST /login`, which carries the
+account's role.
+
+| Role       | Can                                                            |
+| ---------- | -------------------------------------------------------------- |
+| `agent`    | Move episodes between stages, register assets, read everything  |
+| `reviewer` | The above, plus record decisions at the two human gates         |
+
+`POST /pipeline/episodes/{id}/approvals` requires the `reviewer` role, so an
+agent cannot approve its own work. The decision is attributed to the identity
+in the token — there is no `reviewer` field in the request body, so a decision
+cannot be recorded against someone who did not make it.
+
+The account list is still in `auth.go` rather than a database, carried over
+from the boilerplate. Replace it with real credential storage, and give each
+agent its own identity, before running this anywhere real.
+
+| Account             | Password      | Role       |
+| ------------------- | ------------- | ---------- |
+| `user@example.com`  | `password123` | `reviewer` |
+| `agent@example.com` | `agent123`    | `agent`    |
 
 ## The state machine
 
@@ -43,10 +68,14 @@ Rules enforced by the API, not by convention:
   through the transition endpoint.
 - Only the moves listed in `episodeTransitions` (`pipeline_state.go`) are legal.
   Anything else returns `409 Conflict` explaining the refusal.
-- The two gate edges are refused for agents entirely. They require a decision
-  posted to the approvals endpoint, and that decision must name a reviewer.
+- The two gate edges are refused on the transition endpoint entirely. They
+  require a decision posted to the approvals endpoint by a `reviewer`.
 - A gate rejection sends the episode back for rework and is recorded either way.
-- Every stage change is written to the episode event log.
+- Every stage change is written to the episode event log, attributed to the
+  authenticated caller.
+
+These rules are covered by tests in `pipeline_state_test.go` and
+`pipeline_api_test.go`.
 
 `CANCELLED` is reachable from any active stage. `ANALYZED` and `CANCELLED` are
 terminal.
@@ -106,31 +135,34 @@ terminal.
 ## Example: one episode end to end
 
 ```bash
-TOKEN=$(curl -s -X POST localhost:8080/login -H 'Content-Type: application/json' \
-  -d '{"email":"user@example.com","password":"password123"}' | jq -r .token)
-AUTH="Authorization: Bearer $TOKEN"
+login() {
+  curl -s -X POST localhost:8080/login -H 'Content-Type: application/json' \
+    -d "{\"email\":\"$1\",\"password\":\"$2\"}" | jq -r .token
+}
+AGENT="Authorization: Bearer $(login agent@example.com agent123)"
+REVIEWER="Authorization: Bearer $(login user@example.com password123)"
 
 # Create — always lands in IDEA_BACKLOG
-curl -X POST localhost:8080/pipeline/episodes -H "$AUTH" -H 'Content-Type: application/json' \
+curl -X POST localhost:8080/pipeline/episodes -H "$AGENT" -H 'Content-Type: application/json' \
   -d '{"title":"Counting Flowers in Giggle Meadow","curriculum_topic_id":1}'
 
 # Script agent picks it up
-curl -X POST localhost:8080/pipeline/episodes/1/transition -H "$AUTH" -H 'Content-Type: application/json' \
+curl -X POST localhost:8080/pipeline/episodes/1/transition -H "$AGENT" -H 'Content-Type: application/json' \
   -d '{"to_status":"SCRIPT_DRAFT","actor":"script-agent"}'
 
-# Gate 1 — human only; an agent posting SCRIPT_APPROVED here gets a 409
-curl -X POST localhost:8080/pipeline/episodes/1/approvals -H "$AUTH" -H 'Content-Type: application/json' \
-  -d '{"gate":"GATE_1_SCRIPT","decision":"APPROVED","reviewer":"advisor@studio.com"}'
+# Gate 1 — the same call with the agent token is refused 403
+curl -X POST localhost:8080/pipeline/episodes/1/approvals -H "$REVIEWER" -H 'Content-Type: application/json' \
+  -d '{"gate":"GATE_1_SCRIPT","decision":"APPROVED","notes":"Age appropriate."}'
 
 # Production agents run their stages
 for S in VO_GENERATED MUSIC_GENERATED ANIMATION_RENDERED ASSEMBLED QA_REVIEW; do
-  curl -X POST localhost:8080/pipeline/episodes/1/transition -H "$AUTH" \
+  curl -X POST localhost:8080/pipeline/episodes/1/transition -H "$AGENT" \
     -H 'Content-Type: application/json' -d "{\"to_status\":\"$S\"}"
 done
 
 # Gate 2 — human sign-off before anything publishes
-curl -X POST localhost:8080/pipeline/episodes/1/approvals -H "$AUTH" -H 'Content-Type: application/json' \
-  -d '{"gate":"GATE_2_RELEASE","decision":"APPROVED","reviewer":"producer@studio.com"}'
+curl -X POST localhost:8080/pipeline/episodes/1/approvals -H "$REVIEWER" -H 'Content-Type: application/json' \
+  -d '{"gate":"GATE_2_RELEASE","decision":"APPROVED","notes":"Made-for-Kids flag verified."}'
 ```
 
 ## Compliance notes
@@ -148,5 +180,10 @@ The scaffold is the orchestrator only. Still to come, per the roadmap:
 - YouTube Data API and TikTok Content Posting API integration in an upload worker
 - The reviewer dashboard UI (`/pipeline/reviews/pending` is the API behind it)
 - Analytics ingestion feeding back into curriculum planning
-- Per-user auth: `/login` is still the boilerplate's single hardcoded account,
-  and every agent currently shares one token
+- **Work claiming.** `GET /pipeline/queue` returns everything at a stage and
+  nothing marks work as taken, so two workers polling the same stage will both
+  pick up the same episode and generate it twice. Run one worker per stage until
+  this lands.
+- Real credential storage, and one identity per agent rather than a shared
+  account (see Roles above)
+- Pagination on the list endpoints

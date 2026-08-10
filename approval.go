@@ -8,7 +8,7 @@ import (
 
 // createApproval godoc
 // @Summary Record a human decision at a gate
-// @Description The only way past the two mandatory review gates. GATE_1_SCRIPT releases an approved script into production; GATE_2_RELEASE clears an assembled episode for publishing. A rejection sends the episode back for rework and is recorded either way.
+// @Description The only way past the two mandatory review gates, and restricted to the reviewer role so an agent cannot approve its own work. GATE_1_SCRIPT releases an approved script into production; GATE_2_RELEASE clears an assembled episode for publishing. The decision is attributed to the authenticated caller, and a rejection sends the episode back for rework.
 // @Tags pipeline-approvals
 // @Accept json
 // @Produce json
@@ -17,6 +17,7 @@ import (
 // @Param approval body ApprovalRequest true "Gate decision"
 // @Success 201 {object} ApprovalLog
 // @Failure 400 {object} ErrorResponse
+// @Failure 403 {object} ErrorResponse
 // @Failure 404 {object} ErrorResponse
 // @Failure 409 {object} ErrorResponse
 // @Router /pipeline/episodes/{id}/approvals [post]
@@ -24,6 +25,16 @@ func createApproval(c *fiber.Ctx) error {
 	id, err := paramID(c)
 	if err != nil {
 		return badRequest(c, "id must be a number")
+	}
+
+	// The reviewer is taken from the token rather than the request body, so
+	// the audit trail records who actually made the call.
+	reviewer := currentSubject(c)
+	if reviewer == "" {
+		return c.Status(fiber.StatusForbidden).JSON(ErrorResponse{
+			Error:   "Forbidden",
+			Message: "token carries no identity to attribute this decision to",
+		})
 	}
 
 	var episode Episode
@@ -34,9 +45,6 @@ func createApproval(c *fiber.Ctx) error {
 	req := new(ApprovalRequest)
 	if err := c.BodyParser(req); err != nil {
 		return badRequest(c, err.Error())
-	}
-	if req.Reviewer == "" {
-		return badRequest(c, "reviewer is required: gate decisions must name the person who made them")
 	}
 	if req.Decision != DecisionApproved && req.Decision != DecisionRejected {
 		return badRequest(c, fmt.Sprintf("decision must be %s or %s", DecisionApproved, DecisionRejected))
@@ -71,7 +79,7 @@ func createApproval(c *fiber.Ctx) error {
 		EpisodeID:  episode.ID,
 		Gate:       req.Gate,
 		Decision:   req.Decision,
-		Reviewer:   req.Reviewer,
+		Reviewer:   reviewer,
 		Notes:      req.Notes,
 		FromStatus: from,
 		ToStatus:   target,
@@ -80,7 +88,7 @@ func createApproval(c *fiber.Ctx) error {
 		return serverError(c, err.Error())
 	}
 
-	recordEvent(episode.ID, from, target, req.Reviewer, fmt.Sprintf("%s %s", req.Gate, req.Decision))
+	recordEvent(episode.ID, from, target, reviewer, fmt.Sprintf("%s %s", req.Gate, req.Decision))
 	return c.Status(fiber.StatusCreated).JSON(approval)
 }
 

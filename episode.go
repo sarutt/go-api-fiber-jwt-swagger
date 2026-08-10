@@ -94,7 +94,7 @@ func createEpisode(c *fiber.Ctx) error {
 		return badRequest(c, err.Error())
 	}
 
-	recordEvent(episode.ID, "", StatusIdeaBacklog, valueOr(c.Query("actor"), "api"), "episode created")
+	recordEvent(episode.ID, "", StatusIdeaBacklog, valueOr(currentSubject(c), "api"), "episode created")
 	return c.Status(fiber.StatusCreated).JSON(episode)
 }
 
@@ -223,7 +223,10 @@ func transitionEpisode(c *fiber.Ctx) error {
 		return serverError(c, err.Error())
 	}
 
-	recordEvent(episode.ID, from, req.ToStatus, valueOr(req.Actor, stageOwners[from]), req.Note)
+	// Prefer the actor the agent names, fall back to its authenticated
+	// identity, and only then to the stage's expected owner.
+	actor := valueOr(req.Actor, valueOr(currentSubject(c), stageOwners[from]))
+	recordEvent(episode.ID, from, req.ToStatus, actor, req.Note)
 	return c.JSON(episode)
 }
 

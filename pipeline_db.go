@@ -20,9 +20,18 @@ func initDB() {
 		path = "pompomhollow.db"
 	}
 
+	if err := setupDB(path); err != nil {
+		log.Fatalf("cannot open database %s: %v", path, err)
+	}
+	log.Printf("pipeline database ready at %s", path)
+}
+
+// setupDB connects, migrates and seeds. Split out from initDB so tests can
+// point it at an in-memory database without taking the process down on error.
+func setupDB(path string) error {
 	conn, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
 	if err != nil {
-		log.Fatalf("cannot open database %s: %v", path, err)
+		return err
 	}
 	db = conn
 
@@ -35,11 +44,11 @@ func initDB() {
 		&ApprovalLog{},
 		&EpisodeEvent{},
 	); err != nil {
-		log.Fatalf("cannot migrate database: %v", err)
+		return err
 	}
 
 	seedShowBible()
-	log.Printf("pipeline database ready at %s", path)
+	return nil
 }
 
 // seedShowBible loads the fixed cast, locations and first curriculum cycle.

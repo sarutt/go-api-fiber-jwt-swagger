@@ -669,7 +669,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "The only way past the two mandatory review gates. GATE_1_SCRIPT releases an approved script into production; GATE_2_RELEASE clears an assembled episode for publishing. A rejection sends the episode back for rework and is recorded either way.",
+                "description": "The only way past the two mandatory review gates, and restricted to the reviewer role so an agent cannot approve its own work. GATE_1_SCRIPT releases an approved script into production; GATE_2_RELEASE clears an assembled episode for publishing. The decision is attributed to the authenticated caller, and a rejection sends the episode back for rework.",
                 "consumes": [
                     "application/json"
                 ],
@@ -707,6 +707,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/main.ErrorResponse"
                         }
@@ -1158,9 +1164,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "notes": {
-                    "type": "string"
-                },
-                "reviewer": {
                     "type": "string"
                 }
             }

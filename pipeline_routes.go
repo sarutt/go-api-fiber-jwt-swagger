@@ -20,10 +20,12 @@ func registerPipelineRoutes(app *fiber.App) {
 	pipeline.Post("/episodes/:id/transition", transitionEpisode)
 	pipeline.Get("/episodes/:id/events", getEpisodeEvents)
 
-	// Human review gates.
+	// Human review gates. Recording a decision is restricted to the reviewer
+	// role: this is what stops an agent approving its own work, since the
+	// state machine alone cannot tell a human caller from a robot one.
 	pipeline.Get("/reviews/pending", getPendingReviews)
 	pipeline.Get("/episodes/:id/approvals", getEpisodeApprovals)
-	pipeline.Post("/episodes/:id/approvals", createApproval)
+	pipeline.Post("/episodes/:id/approvals", requireRole(RoleReviewer), createApproval)
 
 	// Files produced by the generation agents.
 	pipeline.Get("/episodes/:id/assets", getEpisodeAssets)

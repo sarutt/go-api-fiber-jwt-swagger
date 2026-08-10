@@ -168,11 +168,12 @@ type TransitionRequest struct {
 	Note     string        `json:"note"`
 }
 
-// ApprovalRequest is the body a human reviewer posts at a gate.
+// ApprovalRequest is the body a human reviewer posts at a gate. The reviewer
+// is not part of the body: it comes from the authenticated identity so a
+// decision cannot be attributed to someone who did not make it.
 type ApprovalRequest struct {
 	Gate     string `json:"gate"`
 	Decision string `json:"decision"`
-	Reviewer string `json:"reviewer"`
 	Notes    string `json:"notes"`
 }
 
