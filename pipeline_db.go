@@ -53,6 +53,7 @@ func setupDB(path string) error {
 		&Asset{},
 		&ApprovalLog{},
 		&EpisodeEvent{},
+		&PipelineControl{},
 	); err != nil {
 		return err
 	}

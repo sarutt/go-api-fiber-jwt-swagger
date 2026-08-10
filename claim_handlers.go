@@ -9,7 +9,7 @@ import (
 
 // claimWork godoc
 // @Summary Take the next job at a stage
-// @Description How a worker picks up work. Hands the oldest available episode at the stage to exactly one caller and holds it under an expiring lease, so two workers polling the same stage never process the same episode. Returns 204 when the stage has nothing free.
+// @Description How a worker picks up work. Hands the oldest available episode at the stage to exactly one caller and holds it under an expiring lease, so two workers polling the same stage never process the same episode. Returns 204 when the stage has nothing free, and 423 when the operator has paused production.
 // @Tags pipeline
 // @Accept json
 // @Produce json
@@ -18,6 +18,7 @@ import (
 // @Success 200 {object} Episode
 // @Success 204 "Nothing available at this stage"
 // @Failure 400 {object} ErrorResponse
+// @Failure 423 {object} ErrorResponse
 // @Router /pipeline/queue/claim [post]
 func claimWork(c *fiber.Ctx) error {
 	req := new(ClaimRequest)
@@ -29,6 +30,18 @@ func claimWork(c *fiber.Ctx) error {
 	}
 	if !isValidStatus(req.Status) {
 		return badRequest(c, fmt.Sprintf("unknown status %q", req.Status))
+	}
+
+	// Taking work is the single choke point the operator's stop switch acts
+	// on. Refusing here rather than mid-job means a pause drains the pipeline
+	// instead of interrupting it: claimed work finishes, nothing new starts.
+	// The distinct status lets a worker back off harder than it would for an
+	// empty queue, rather than hammering a paused stage.
+	if paused, reason := productionPaused(req.Status); paused {
+		return c.Status(fiber.StatusLocked).JSON(ErrorResponse{
+			Error:   "Paused",
+			Message: valueOr(reason, "production is paused by the operator"),
+		})
 	}
 
 	// Fall back to the token identity so a single worker still gets a stable

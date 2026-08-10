@@ -21,7 +21,18 @@ const (
 	StatusPublished         EpisodeStatus = "PUBLISHED"
 	StatusAnalyzed          EpisodeStatus = "ANALYZED"
 	StatusCancelled         EpisodeStatus = "CANCELLED"
+	// StatusFailed parks an episode a worker could not finish, so a job that
+	// keeps failing stops being retried and waits for a person instead.
+	StatusFailed EpisodeStatus = "FAILED"
 )
+
+// maxAttempts is how many times a stage is retried before the episode is
+// parked in FAILED. Without a cap a permanently failing job cycles forever,
+// quietly spending generation budget on every attempt.
+const maxAttempts = 3
+
+// ControlScopeAll pauses the whole pipeline rather than a single stage.
+const ControlScopeAll = "ALL"
 
 // Gate names for the two mandatory human review points.
 const (
@@ -84,7 +95,25 @@ type Episode struct {
 	// episode changes stage.
 	ClaimedBy string     `json:"claimed_by" gorm:"index;size:120"`
 	ClaimedAt *time.Time `json:"claimed_at"`
-	CreatedAt time.Time  `json:"created_at"`
+	// Attempts counts how many times the current stage has been tried. It
+	// resets whenever the episode moves on, so it measures this stage rather
+	// than the episode's whole history.
+	Attempts   int           `json:"attempts"`
+	LastError  string        `json:"last_error"`
+	FailedFrom EpisodeStatus `json:"failed_from" gorm:"size:32"`
+	CreatedAt  time.Time     `json:"created_at"`
+	UpdatedAt  time.Time     `json:"updated_at"`
+}
+
+// PipelineControl is the admin's stop switch. One row per scope: the whole
+// pipeline, or a single stage.
+type PipelineControl struct {
+	ID        uint       `json:"id" gorm:"primaryKey"`
+	Scope     string     `json:"scope" gorm:"uniqueIndex;size:32"`
+	Paused    bool       `json:"paused"`
+	Reason    string     `json:"reason"`
+	PausedBy  string     `json:"paused_by" gorm:"size:120"`
+	PausedAt  *time.Time `json:"paused_at"`
 	UpdatedAt time.Time  `json:"updated_at"`
 }
 
@@ -185,6 +214,40 @@ type ClaimRequest struct {
 // WorkerRequest identifies the worker releasing or extending a claim.
 type WorkerRequest struct {
 	WorkerID string `json:"worker_id"`
+}
+
+// FailRequest is how a worker reports that it could not finish its job.
+type FailRequest struct {
+	WorkerID string `json:"worker_id"`
+	Error    string `json:"error"`
+}
+
+// PauseRequest is the admin stopping production.
+type PauseRequest struct {
+	Scope  string `json:"scope"`
+	Reason string `json:"reason"`
+}
+
+// StageCount is how many episodes sit at one stage.
+type StageCount struct {
+	Status EpisodeStatus `json:"status"`
+	Count  int64         `json:"count"`
+	Paused bool          `json:"paused"`
+}
+
+// PipelineOverview is the admin's single view of the whole operation: what is
+// running, what is stuck, what is waiting on them, and what has broken.
+type PipelineOverview struct {
+	Paused         bool         `json:"paused"`
+	PauseReason    string       `json:"pause_reason,omitempty"`
+	PausedStages   []string     `json:"paused_stages"`
+	Stages         []StageCount `json:"stages"`
+	InFlight       int64        `json:"in_flight"`
+	ClaimedNow     int64        `json:"claimed_now"`
+	AwaitingReview int64        `json:"awaiting_review"`
+	Failed         int64        `json:"failed"`
+	PublishedTotal int64        `json:"published_total"`
+	Stuck          []Episode    `json:"stuck"`
 }
 
 // ApprovalRequest is the body a human reviewer posts at a gate. The reviewer

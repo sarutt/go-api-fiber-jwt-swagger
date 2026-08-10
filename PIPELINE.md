@@ -34,10 +34,16 @@ every pull request.
 All `/pipeline/*` routes require a JWT from `POST /login`, which carries the
 account's role.
 
-| Role       | Can                                                            |
-| ---------- | -------------------------------------------------------------- |
-| `agent`    | Move episodes between stages, register assets, read everything  |
-| `reviewer` | The above, plus record decisions at the two human gates         |
+| Role       | Can                                                             |
+| ---------- | --------------------------------------------------------------- |
+| `agent`    | Move episodes between stages, register assets, read everything   |
+| `reviewer` | The above, plus record decisions at the two human gates          |
+| `admin`    | The above, plus pause production and rescue failed episodes      |
+
+A higher role satisfies a lower requirement, so one admin account runs the
+whole operation without a second login. This does not weaken the gates: they
+exist to stop an agent approving its own output, and every role above `agent`
+is a person.
 
 `POST /pipeline/episodes/{id}/approvals` requires the `reviewer` role, so an
 agent cannot approve its own work. The decision is attributed to the identity
@@ -50,8 +56,51 @@ agent its own identity, before running this anywhere real.
 
 | Account             | Password      | Role       |
 | ------------------- | ------------- | ---------- |
+| `admin@example.com` | `admin123`    | `admin`    |
 | `user@example.com`  | `password123` | `reviewer` |
 | `agent@example.com` | `agent123`    | `agent`    |
+
+## Running it as one person
+
+The system is built to be operated by a single admin. Everything they need is
+behind two endpoints.
+
+**`GET /pipeline/overview`** is the whole board on one screen: whether
+production is running, how many episodes sit at each stage, what is waiting on
+a human, what has failed, and what has gone quiet — anything untouched for 24
+hours is surfaced, because one operator will not notice it otherwise.
+
+**`POST /pipeline/control/pause`** is the stop switch.
+
+```bash
+# Stop everything
+curl -X POST localhost:8080/pipeline/control/pause -H "$ADMIN" -H 'Content-Type: application/json' \
+  -d '{"scope":"ALL","reason":"checking a policy question"}'
+
+# Or hold just one step — uploads paused, production carries on
+curl -X POST localhost:8080/pipeline/control/pause -H "$ADMIN" -H 'Content-Type: application/json' \
+  -d '{"scope":"SCHEDULED","reason":"holding uploads over the weekend"}'
+
+curl -X POST localhost:8080/pipeline/control/resume -H "$ADMIN" -H 'Content-Type: application/json' \
+  -d '{"scope":"ALL"}'
+```
+
+A pause **drains** rather than halts: it is enforced at the moment work is
+taken, so claimed jobs finish and nothing new starts. Workers get `423` with
+the reason, and pick up again on their next poll after a resume — nothing
+needs restarting.
+
+### When a job keeps failing
+
+A worker that gives up posts to `/pipeline/episodes/{id}/fail`. The stage is
+retried up to three times; after that the episode is parked in `FAILED` with
+the last error and the stage it broke at, instead of being retried forever and
+spending generation budget on every attempt.
+
+`FAILED` is terminal in the state machine. The only way out is
+`POST /pipeline/episodes/{id}/retry`, which is admin-only and puts the episode
+back at the stage it failed at with the attempt count cleared — so a fix to the
+underlying problem can be tried without recreating the episode.
 
 ## The state machine
 
@@ -59,6 +108,9 @@ agent its own identity, before running this anywhere real.
 IDEA_BACKLOG → SCRIPT_DRAFT → [GATE 1] → SCRIPT_APPROVED → VO_GENERATED
   → MUSIC_GENERATED → ANIMATION_RENDERED → ASSEMBLED → QA_REVIEW → [GATE 2]
   → PLATFORM_ADAPTED → SCHEDULED → PUBLISHED → ANALYZED
+
+any active stage → FAILED (after 3 attempts) → retry → back to that stage
+any active stage → CANCELLED
 ```
 
 Rules enforced by the API, not by convention:
@@ -129,6 +181,10 @@ does, and should not be simplified away.
 | GET    | `/pipeline/stages`       | Describes every stage, its owner agent and gate |
 | GET    | `/pipeline/queue`        | `?status=` — read-only view of a stage's queue  |
 | POST   | `/pipeline/queue/claim`  | Take the next job at a stage                    |
+| GET    | `/pipeline/overview`     | The whole operation on one screen                |
+| GET    | `/pipeline/control`      | What is currently paused                         |
+| POST   | `/pipeline/control/pause`  | Stop production (admin)                        |
+| POST   | `/pipeline/control/resume` | Start it again (admin)                         |
 
 **Episodes**
 
@@ -142,6 +198,8 @@ does, and should not be simplified away.
 | POST   | `/pipeline/episodes/{id}/transition`     | Move to the next stage       |
 | POST   | `/pipeline/episodes/{id}/release`        | Give a claimed episode back  |
 | POST   | `/pipeline/episodes/{id}/heartbeat`      | Extend a claim on a long job |
+| POST   | `/pipeline/episodes/{id}/fail`           | Report a job that could not finish |
+| POST   | `/pipeline/episodes/{id}/retry`          | Put a failed episode back to work (admin) |
 | GET    | `/pipeline/episodes/{id}/events`         | Stage history                |
 
 **Human review gates**
@@ -226,6 +284,7 @@ The scaffold is the orchestrator only. Still to come, per the roadmap:
 - Real credential storage, and one identity per agent rather than a shared
   account (see Roles above)
 - Pagination on the list endpoints
-- A `FAILED` stage and retry accounting: a worker that gives up can only
-  release the episode back to the queue, so a job that always fails will be
-  retried forever
+- The worker runtime: agents still have to implement the claim/work/transition
+  loop themselves rather than importing a shared one
+- Alerting. The overview reports stuck and failed episodes, but nothing pushes
+  that to the operator — they have to look

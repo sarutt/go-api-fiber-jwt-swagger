@@ -137,6 +137,12 @@ definitions:
     properties:
       ai_disclosure:
         type: boolean
+      attempts:
+        description: |-
+          Attempts counts how many times the current stage has been tried. It
+          resets whenever the episode moves on, so it measures this stage rather
+          than the episode's whole history.
+        type: integer
       claimed_at:
         type: string
       claimed_by:
@@ -154,8 +160,12 @@ definitions:
         type: integer
       duration_seconds:
         type: integer
+      failed_from:
+        $ref: '#/definitions/main.EpisodeStatus'
       id:
         type: integer
+      last_error:
+        type: string
       made_for_kids:
         description: |-
           MadeForKids drives the YouTube selfDeclaredMadeForKids flag. It defaults
@@ -217,6 +227,7 @@ definitions:
     - PUBLISHED
     - ANALYZED
     - CANCELLED
+    - FAILED
     type: string
     x-enum-varnames:
     - StatusIdeaBacklog
@@ -232,11 +243,19 @@ definitions:
     - StatusPublished
     - StatusAnalyzed
     - StatusCancelled
+    - StatusFailed
   main.ErrorResponse:
     properties:
       error:
         type: string
       message:
+        type: string
+    type: object
+  main.FailRequest:
+    properties:
+      error:
+        type: string
+      worker_id:
         type: string
     type: object
   main.Location:
@@ -255,6 +274,68 @@ definitions:
         type: string
       used_for:
         type: string
+    type: object
+  main.PauseRequest:
+    properties:
+      reason:
+        type: string
+      scope:
+        type: string
+    type: object
+  main.PipelineControl:
+    properties:
+      id:
+        type: integer
+      paused:
+        type: boolean
+      paused_at:
+        type: string
+      paused_by:
+        type: string
+      reason:
+        type: string
+      scope:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  main.PipelineOverview:
+    properties:
+      awaiting_review:
+        type: integer
+      claimed_now:
+        type: integer
+      failed:
+        type: integer
+      in_flight:
+        type: integer
+      pause_reason:
+        type: string
+      paused:
+        type: boolean
+      paused_stages:
+        items:
+          type: string
+        type: array
+      published_total:
+        type: integer
+      stages:
+        items:
+          $ref: '#/definitions/main.StageCount'
+        type: array
+      stuck:
+        items:
+          $ref: '#/definitions/main.Episode'
+        type: array
+    type: object
+  main.StageCount:
+    properties:
+      count:
+        type: integer
+      paused:
+        type: boolean
+      status:
+        $ref: '#/definitions/main.EpisodeStatus'
     type: object
   main.StageInfo:
     properties:
@@ -433,6 +514,90 @@ paths:
       summary: Update a character
       tags:
       - showbible
+  /pipeline/control:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.PipelineControl'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: Show what is paused
+      tags:
+      - pipeline-control
+  /pipeline/control/pause:
+    post:
+      consumes:
+      - application/json
+      description: 'The operator''s stop switch. Workers can no longer take work,
+        so the pipeline drains rather than halting mid-job: whatever is already claimed
+        finishes, nothing new starts. Pass a stage as the scope to pause one step
+        — pausing SCHEDULED holds uploads while the rest keeps producing.'
+      parameters:
+      - description: What to pause and why
+        in: body
+        name: pause
+        required: true
+        schema:
+          $ref: '#/definitions/main.PauseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.PipelineControl'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Stop production
+      tags:
+      - pipeline-control
+  /pipeline/control/resume:
+    post:
+      consumes:
+      - application/json
+      description: Lifts a pause. Workers begin taking work at their next poll; nothing
+        needs restarting.
+      parameters:
+      - description: What to resume
+        in: body
+        name: pause
+        required: true
+        schema:
+          $ref: '#/definitions/main.PauseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.PipelineControl'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Start production again
+      tags:
+      - pipeline-control
   /pipeline/curriculum-topics:
     get:
       parameters:
@@ -851,6 +1016,45 @@ paths:
       summary: Get the stage history of an episode
       tags:
       - pipeline-episodes
+  /pipeline/episodes/{id}/fail:
+    post:
+      consumes:
+      - application/json
+      description: Called by a worker that has given up. The stage is retried until
+        the attempt limit, after which the episode is parked in FAILED for a person
+        to look at rather than being retried forever.
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: What went wrong
+        in: body
+        name: failure
+        required: true
+        schema:
+          $ref: '#/definitions/main.FailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Episode'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Report that a job could not be finished
+      tags:
+      - pipeline-episodes
   /pipeline/episodes/{id}/heartbeat:
     post:
       consumes:
@@ -928,6 +1132,41 @@ paths:
       summary: Give a claimed episode back
       tags:
       - pipeline
+  /pipeline/episodes/{id}/retry:
+    post:
+      description: The one sanctioned way out of FAILED. Restores the stage the episode
+        failed at and clears the attempt count, so a fix to the underlying problem
+        can be tried without recreating the episode.
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Episode'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Put a failed episode back to work
+      tags:
+      - pipeline-control
   /pipeline/episodes/{id}/transition:
     post:
       consumes:
@@ -1009,6 +1248,23 @@ paths:
       summary: Add a set
       tags:
       - showbible
+  /pipeline/overview:
+    get:
+      description: 'Everything one operator needs to see at a glance: whether production
+        is running, how much sits at each stage, what is waiting on a human, what
+        has failed, and what has gone quiet.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.PipelineOverview'
+      security:
+      - ApiKeyAuth: []
+      summary: The whole operation on one screen
+      tags:
+      - pipeline-control
   /pipeline/queue:
     get:
       description: Read-only view of everything waiting at a stage, including which
@@ -1045,7 +1301,8 @@ paths:
       description: How a worker picks up work. Hands the oldest available episode
         at the stage to exactly one caller and holds it under an expiring lease, so
         two workers polling the same stage never process the same episode. Returns
-        204 when the stage has nothing free.
+        204 when the stage has nothing free, and 423 when the operator has paused
+        production.
       parameters:
       - description: Stage to take work from
         in: body
@@ -1064,6 +1321,10 @@ paths:
           description: Nothing available at this stage
         "400":
           description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "423":
+          description: Locked
           schema:
             $ref: '#/definitions/main.ErrorResponse'
       security:

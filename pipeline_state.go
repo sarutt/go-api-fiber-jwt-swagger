@@ -6,19 +6,23 @@ import "fmt"
 // a status listed here for its current status; anything else is rejected.
 // Backward edges exist where a gate rejection sends work back for rework.
 var episodeTransitions = map[EpisodeStatus][]EpisodeStatus{
-	StatusIdeaBacklog:       {StatusScriptDraft, StatusCancelled},
-	StatusScriptDraft:       {StatusScriptApproved, StatusIdeaBacklog, StatusCancelled},
-	StatusScriptApproved:    {StatusVOGenerated, StatusScriptDraft, StatusCancelled},
-	StatusVOGenerated:       {StatusMusicGenerated, StatusCancelled},
-	StatusMusicGenerated:    {StatusAnimationRendered, StatusCancelled},
-	StatusAnimationRendered: {StatusAssembled, StatusCancelled},
-	StatusAssembled:         {StatusQAReview, StatusCancelled},
-	StatusQAReview:          {StatusPlatformAdapted, StatusAssembled, StatusCancelled},
-	StatusPlatformAdapted:   {StatusScheduled, StatusCancelled},
-	StatusScheduled:         {StatusPublished, StatusPlatformAdapted, StatusCancelled},
+	StatusIdeaBacklog:       {StatusScriptDraft, StatusFailed, StatusCancelled},
+	StatusScriptDraft:       {StatusScriptApproved, StatusIdeaBacklog, StatusFailed, StatusCancelled},
+	StatusScriptApproved:    {StatusVOGenerated, StatusScriptDraft, StatusFailed, StatusCancelled},
+	StatusVOGenerated:       {StatusMusicGenerated, StatusFailed, StatusCancelled},
+	StatusMusicGenerated:    {StatusAnimationRendered, StatusFailed, StatusCancelled},
+	StatusAnimationRendered: {StatusAssembled, StatusFailed, StatusCancelled},
+	StatusAssembled:         {StatusQAReview, StatusFailed, StatusCancelled},
+	StatusQAReview:          {StatusPlatformAdapted, StatusAssembled, StatusFailed, StatusCancelled},
+	StatusPlatformAdapted:   {StatusScheduled, StatusFailed, StatusCancelled},
+	StatusScheduled:         {StatusPublished, StatusPlatformAdapted, StatusFailed, StatusCancelled},
 	StatusPublished:         {StatusAnalyzed},
 	StatusAnalyzed:          {},
-	StatusCancelled:         {},
+	// FAILED is terminal as far as the table goes. The only sanctioned way
+	// out is the admin retry endpoint, which restores the stage the episode
+	// failed at rather than allowing an arbitrary jump.
+	StatusFailed:    {StatusCancelled},
+	StatusCancelled: {},
 }
 
 // gateFor returns the human review gate guarding a transition, if any.
@@ -49,6 +53,7 @@ var stageOwners = map[EpisodeStatus]string{
 	StatusScheduled:         "upload-agent",
 	StatusPublished:         "analytics-agent",
 	StatusAnalyzed:          "",
+	StatusFailed:            "admin (human)",
 	StatusCancelled:         "",
 }
 
@@ -66,6 +71,7 @@ var stageLayers = map[EpisodeStatus]string{
 	StatusScheduled:         "5-distribution",
 	StatusPublished:         "6-feedback",
 	StatusAnalyzed:          "6-feedback",
+	StatusFailed:            "-",
 	StatusCancelled:         "-",
 }
 
@@ -83,6 +89,7 @@ var stageOrder = []EpisodeStatus{
 	StatusScheduled,
 	StatusPublished,
 	StatusAnalyzed,
+	StatusFailed,
 	StatusCancelled,
 }
 

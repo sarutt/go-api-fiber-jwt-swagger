@@ -226,8 +226,11 @@ func transitionEpisode(c *fiber.Ctx) error {
 		episode.PublishedAt = &now
 	}
 	// The claim belonged to the stage just finished, so the next stage starts
-	// unclaimed and its own worker can take it.
+	// unclaimed and its own worker can take it. Attempts count the current
+	// stage, so they reset with it.
 	clearClaim(&episode)
+	episode.Attempts = 0
+	episode.LastError = ""
 
 	if err := db.Save(&episode).Error; err != nil {
 		return serverError(c, err.Error())

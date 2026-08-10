@@ -22,7 +22,16 @@ func registerPipelineRoutes(app *fiber.App) {
 	pipeline.Post("/episodes/:id/transition", transitionEpisode)
 	pipeline.Post("/episodes/:id/release", releaseClaim)
 	pipeline.Post("/episodes/:id/heartbeat", heartbeatClaim)
+	pipeline.Post("/episodes/:id/fail", failEpisode)
 	pipeline.Get("/episodes/:id/events", getEpisodeEvents)
+
+	// Operator controls. Pausing production, and rescuing a failed episode,
+	// are deliberately admin-only: they change what the whole system does.
+	pipeline.Get("/overview", getOverview)
+	pipeline.Get("/control", getControl)
+	pipeline.Post("/control/pause", requireRole(RoleAdmin), pausePipeline)
+	pipeline.Post("/control/resume", requireRole(RoleAdmin), resumePipeline)
+	pipeline.Post("/episodes/:id/retry", requireRole(RoleAdmin), retryEpisode)
 
 	// Human review gates. Recording a decision is restricted to the reviewer
 	// role: this is what stops an agent approving its own work, since the

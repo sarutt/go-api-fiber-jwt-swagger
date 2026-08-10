@@ -239,6 +239,135 @@ const docTemplate = `{
                 }
             }
         },
+        "/pipeline/control": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-control"
+                ],
+                "summary": "Show what is paused",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.PipelineControl"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/control/pause": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "The operator's stop switch. Workers can no longer take work, so the pipeline drains rather than halting mid-job: whatever is already claimed finishes, nothing new starts. Pass a stage as the scope to pause one step — pausing SCHEDULED holds uploads while the rest keeps producing.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-control"
+                ],
+                "summary": "Stop production",
+                "parameters": [
+                    {
+                        "description": "What to pause and why",
+                        "name": "pause",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.PauseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.PipelineControl"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/control/resume": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Lifts a pause. Workers begin taking work at their next poll; nothing needs restarting.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-control"
+                ],
+                "summary": "Start production again",
+                "parameters": [
+                    {
+                        "description": "What to resume",
+                        "name": "pause",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.PauseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.PipelineControl"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/pipeline/curriculum-topics": {
             "get": {
                 "security": [
@@ -876,6 +1005,64 @@ const docTemplate = `{
                 }
             }
         },
+        "/pipeline/episodes/{id}/fail": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Called by a worker that has given up. The stage is retried until the attempt limit, after which the episode is parked in FAILED for a person to look at rather than being retried forever.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-episodes"
+                ],
+                "summary": "Report that a job could not be finished",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "What went wrong",
+                        "name": "failure",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.FailRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Episode"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/pipeline/episodes/{id}/heartbeat": {
             "post": {
                 "security": [
@@ -975,6 +1162,58 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/main.Episode"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/episodes/{id}/retry": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "The one sanctioned way out of FAILED. Restores the stage the episode failed at and clears the attempt count, so a fix to the underlying problem can be tried without recreating the episode.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-control"
+                ],
+                "summary": "Put a failed episode back to work",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Episode"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
                         }
                     },
                     "404": {
@@ -1119,6 +1358,31 @@ const docTemplate = `{
                 }
             }
         },
+        "/pipeline/overview": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Everything one operator needs to see at a glance: whether production is running, how much sits at each stage, what is waiting on a human, what has failed, and what has gone quiet.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-control"
+                ],
+                "summary": "The whole operation on one screen",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.PipelineOverview"
+                        }
+                    }
+                }
+            }
+        },
         "/pipeline/queue": {
             "get": {
                 "security": [
@@ -1169,7 +1433,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "How a worker picks up work. Hands the oldest available episode at the stage to exactly one caller and holds it under an expiring lease, so two workers polling the same stage never process the same episode. Returns 204 when the stage has nothing free.",
+                "description": "How a worker picks up work. Hands the oldest available episode at the stage to exactly one caller and holds it under an expiring lease, so two workers polling the same stage never process the same episode. Returns 204 when the stage has nothing free, and 423 when the operator has paused production.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1203,6 +1467,12 @@ const docTemplate = `{
                     },
                     "400": {
                         "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "423": {
+                        "description": "Locked",
                         "schema": {
                             "$ref": "#/definitions/main.ErrorResponse"
                         }
@@ -1488,6 +1758,10 @@ const docTemplate = `{
                 "ai_disclosure": {
                     "type": "boolean"
                 },
+                "attempts": {
+                    "description": "Attempts counts how many times the current stage has been tried. It\nresets whenever the episode moves on, so it measures this stage rather\nthan the episode's whole history.",
+                    "type": "integer"
+                },
                 "claimed_at": {
                     "type": "string"
                 },
@@ -1507,8 +1781,14 @@ const docTemplate = `{
                 "duration_seconds": {
                     "type": "integer"
                 },
+                "failed_from": {
+                    "$ref": "#/definitions/main.EpisodeStatus"
+                },
                 "id": {
                     "type": "integer"
+                },
+                "last_error": {
+                    "type": "string"
                 },
                 "made_for_kids": {
                     "description": "MadeForKids drives the YouTube selfDeclaredMadeForKids flag. It defaults\nto true because every episode of this show is children's content, and\ngetting this wrong is a COPPA problem rather than a cosmetic one.",
@@ -1590,7 +1870,8 @@ const docTemplate = `{
                 "SCHEDULED",
                 "PUBLISHED",
                 "ANALYZED",
-                "CANCELLED"
+                "CANCELLED",
+                "FAILED"
             ],
             "x-enum-varnames": [
                 "StatusIdeaBacklog",
@@ -1605,7 +1886,8 @@ const docTemplate = `{
                 "StatusScheduled",
                 "StatusPublished",
                 "StatusAnalyzed",
-                "StatusCancelled"
+                "StatusCancelled",
+                "StatusFailed"
             ]
         },
         "main.ErrorResponse": {
@@ -1615,6 +1897,17 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.FailRequest": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "worker_id": {
                     "type": "string"
                 }
             }
@@ -1642,6 +1935,101 @@ const docTemplate = `{
                 },
                 "used_for": {
                     "type": "string"
+                }
+            }
+        },
+        "main.PauseRequest": {
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "type": "string"
+                },
+                "scope": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.PipelineControl": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "paused": {
+                    "type": "boolean"
+                },
+                "paused_at": {
+                    "type": "string"
+                },
+                "paused_by": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "scope": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.PipelineOverview": {
+            "type": "object",
+            "properties": {
+                "awaiting_review": {
+                    "type": "integer"
+                },
+                "claimed_now": {
+                    "type": "integer"
+                },
+                "failed": {
+                    "type": "integer"
+                },
+                "in_flight": {
+                    "type": "integer"
+                },
+                "pause_reason": {
+                    "type": "string"
+                },
+                "paused": {
+                    "type": "boolean"
+                },
+                "paused_stages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "published_total": {
+                    "type": "integer"
+                },
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/main.StageCount"
+                    }
+                },
+                "stuck": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/main.Episode"
+                    }
+                }
+            }
+        },
+        "main.StageCount": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "paused": {
+                    "type": "boolean"
+                },
+                "status": {
+                    "$ref": "#/definitions/main.EpisodeStatus"
                 }
             }
         },
