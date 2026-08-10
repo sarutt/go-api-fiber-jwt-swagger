@@ -102,6 +102,49 @@ spending generation budget on every attempt.
 back at the stage it failed at with the attempt count cleared — so a fix to the
 underlying problem can be tried without recreating the episode.
 
+## Writing an agent
+
+Agents are built on the `worker` package rather than reimplementing the loop.
+Supply a handler that does one stage's actual work; the runtime takes exactly
+one job at a time, keeps the claim alive while a long job runs, records the
+assets, advances the episode, and reports failures so a job that cannot
+succeed stops being retried.
+
+```go
+agent, err := worker.New(worker.Config{
+    BaseURL:  "http://localhost:8080",
+    Token:    token,
+    WorkerID: "voiceover-agent-7", // unique per process
+    Stage:    "SCRIPT_APPROVED",
+}, func(ctx context.Context, episode worker.Episode) (worker.Result, error) {
+    uri, err := renderVoiceOver(ctx, episode.ScriptText)
+    if err != nil {
+        return worker.Result{}, err // reported as a failed attempt
+    }
+    return worker.Result{
+        NextStatus: "VO_GENERATED",
+        Assets:     []worker.Asset{{Kind: "VOICEOVER", URI: uri}},
+    }, nil
+})
+agent.Run(ctx)
+```
+
+The runtime talks HTTP and does not import the server's types, so an agent can
+live in its own repository. Cancelling the context stops a worker between
+jobs, so a shutdown never abandons a claim.
+
+`cmd/demoworker` runs every automated stage with stub handlers, which is how
+the pipeline can be exercised end to end before any model or render tooling
+exists:
+
+```bash
+go run .                  # the pipeline
+go run ./cmd/demoworker   # nine stub workers
+```
+
+Create an episode and the workers carry it to the first gate and stop, because
+approving is a person's job. Approve it and they pick it up again on their own.
+
 ## The state machine
 
 ```
@@ -284,7 +327,7 @@ The scaffold is the orchestrator only. Still to come, per the roadmap:
 - Real credential storage, and one identity per agent rather than a shared
   account (see Roles above)
 - Pagination on the list endpoints
-- The worker runtime: agents still have to implement the claim/work/transition
-  loop themselves rather than importing a shared one
 - Alerting. The overview reports stuck and failed episodes, but nothing pushes
   that to the operator — they have to look
+- An operator UI. Everything is reachable over the API; there is no dashboard
+  yet
