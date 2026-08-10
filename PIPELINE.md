@@ -62,8 +62,17 @@ agent its own identity, before running this anywhere real.
 
 ## Running it as one person
 
-The system is built to be operated by a single admin. Everything they need is
-behind two endpoints.
+The system is built to be operated by a single admin. Open
+<http://localhost:8080/admin> and sign in.
+
+The console shows what needs a person first, then the numbers, then what has
+broken. From it the operator can stop and start production, work both review
+gates, and retry a failed episode. It polls every five seconds, so a board
+left open stays current. The page is public because it is where people sign
+in; every call it makes afterwards carries the token and is checked like any
+other client's.
+
+Everything it does is available on the API directly:
 
 **`GET /pipeline/overview`** is the whole board on one screen: whether
 production is running, how many episodes sit at each stage, what is waiting on
@@ -329,5 +338,5 @@ The scaffold is the orchestrator only. Still to come, per the roadmap:
 - Pagination on the list endpoints
 - Alerting. The overview reports stuck and failed episodes, but nothing pushes
   that to the operator — they have to look
-- An operator UI. Everything is reachable over the API; there is no dashboard
-  yet
+- Editing an episode from the console — it reviews and controls, but content
+  is still changed through the API

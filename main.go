@@ -54,6 +54,9 @@ func main() {
 	// Login route
 	app.Post("/login", login(secretKey))
 
+	// Operator console, public because it is the page people sign in on
+	registerDashboard(app)
+
 	// JWT Middleware
 	app.Use(jwtware.New(jwtware.Config{
 		SigningKey: []byte(secretKey),

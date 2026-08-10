@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Pom Pom Hollow — Operations</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --ground: #f6f8f9;
+    --surface: #ffffff;
+    --sunk: #eef2f4;
+    --ink: #16202a;
+    --ink-soft: #5a6b78;
+    --ink-faint: #8697a3;
+    --line: #dae2e7;
+    --accent: #ff6b35;
+    --tech: #0d6e78;
+    --tech-soft: #d7eef0;
+    --critical: #c2352b;
+    --critical-soft: #fbe3e1;
+    --warn: #96650a;
+    --warn-soft: #fbeecd;
+    --done: #1d7a4d;
+    --done-soft: #d8f0e3;
+    --shadow: 0 1px 2px rgba(22,32,42,.05), 0 10px 30px -18px rgba(22,32,42,.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground: #0d1319; --surface: #141c23; --sunk: #1a242c;
+      --ink: #e4edf3; --ink-soft: #9aabb7; --ink-faint: #6d7f8c;
+      --line: #26333d; --accent: #ff8659; --tech: #3fb3bd; --tech-soft: #102e31;
+      --critical: #f0736a; --critical-soft: #381c1a;
+      --warn: #e0ab4a; --warn-soft: #33260f;
+      --done: #4bbd85; --done-soft: #12301f;
+      --shadow: 0 1px 2px rgba(0,0,0,.35), 0 10px 30px -18px rgba(0,0,0,.8);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--ground); color: var(--ink);
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 15px; line-height: 1.55; -webkit-font-smoothing: antialiased;
+  }
+  h1,h2,h3 { margin: 0; font-weight: 700; letter-spacing: -.01em; }
+  button { font: inherit; cursor: pointer; border-radius: 6px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: .45rem .9rem; }
+  button:hover { border-color: var(--ink-faint); }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button:focus-visible, input:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  input, textarea {
+    font: inherit; width: 100%; padding: .5rem .65rem; border-radius: 6px;
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  }
+  .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; }
+  .wrap { max-width: 1040px; margin: 0 auto; padding: 0 1.2rem; }
+
+  /* login */
+  #login { display: grid; place-items: center; min-height: 100vh; padding: 1.2rem; }
+  #login form { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 1.8rem; width: min(360px, 100%); box-shadow: var(--shadow); }
+  #login h1 { font-size: 1.25rem; margin-bottom: .3rem; }
+  #login p { color: var(--ink-soft); font-size: .88rem; margin: 0 0 1.2rem; }
+  #login label { display: block; font-size: .78rem; text-transform: uppercase; letter-spacing: .07em; color: var(--ink-faint); margin: .9rem 0 .3rem; }
+  #login button { width: 100%; margin-top: 1.2rem; background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; padding: .6rem; }
+
+  /* header */
+  header { background: var(--surface); border-bottom: 1px solid var(--line); position: sticky; top: 0; z-index: 20; }
+  .bar { display: flex; align-items: center; gap: 1rem; padding: .85rem 0; flex-wrap: wrap; }
+  .brand { font-weight: 700; font-size: 1.02rem; margin-right: auto; }
+  .brand small { display: block; font-weight: 400; font-size: .74rem; color: var(--ink-faint); letter-spacing: .06em; text-transform: uppercase; }
+  .state { display: inline-flex; align-items: center; gap: .45rem; font-weight: 700; font-size: .82rem; padding: .3rem .7rem; border-radius: 100px; }
+  .state.running { background: var(--done-soft); color: var(--done); }
+  .state.paused { background: var(--warn-soft); color: var(--warn); }
+  .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .stop { background: var(--critical); border-color: var(--critical); color: #fff; font-weight: 600; }
+  .start { background: var(--done); border-color: var(--done); color: #fff; font-weight: 600; }
+  .who { font-size: .78rem; color: var(--ink-faint); }
+
+  /* layout */
+  main { padding: 1.5rem 0 4rem; }
+  section { margin-bottom: 1.8rem; }
+  .sec-title { display: flex; align-items: baseline; gap: .6rem; margin-bottom: .7rem; }
+  .sec-title h2 { font-size: .78rem; text-transform: uppercase; letter-spacing: .1em; color: var(--ink-faint); }
+  .count-pill { font-size: .72rem; font-weight: 700; padding: .1rem .45rem; border-radius: 100px; background: var(--sunk); color: var(--ink-soft); }
+  .count-pill.hot { background: var(--accent); color: #fff; }
+
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px,1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .tile { background: var(--surface); padding: .85rem 1rem; }
+  .tile .k { font-size: .68rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-faint); }
+  .tile .v { font-size: 1.55rem; font-weight: 700; margin-top: .1rem; }
+  .tile .v.alert { color: var(--critical); }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 9px; padding: 1rem 1.1rem; box-shadow: var(--shadow); margin-bottom: .7rem; }
+  .card.attention { border-left: 3px solid var(--accent); }
+  .card.broken { border-left: 3px solid var(--critical); }
+  .card.quiet { border-left: 3px solid var(--warn); }
+  .card-top { display: flex; align-items: center; gap: .7rem; flex-wrap: wrap; }
+  .card-top .code { font-weight: 700; font-size: .85rem; }
+  .card-top .title { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .badge { font-size: .68rem; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: .16rem .5rem; border-radius: 4px; background: var(--sunk); color: var(--ink-soft); }
+  .badge.g1 { background: var(--tech-soft); color: var(--tech); }
+  .badge.g2 { background: var(--accent); color: #fff; }
+  .badge.err { background: var(--critical-soft); color: var(--critical); }
+  .card .meta { font-size: .82rem; color: var(--ink-soft); margin-top: .35rem; }
+  .empty { color: var(--ink-faint); font-size: .88rem; padding: .9rem 0; }
+
+  /* stages */
+  .stages { background: var(--surface); border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+  .stage-row { display: grid; grid-template-columns: 1fr 3rem; align-items: center; gap: .8rem; padding: .4rem 1rem; border-bottom: 1px solid var(--line); }
+  .stage-row:last-child { border-bottom: none; }
+  .stage-row.zero { opacity: .45; }
+  .stage-name { display: flex; align-items: center; gap: .5rem; font-size: .8rem; }
+  .stage-name .nm { font-weight: 600; }
+  .bar-track { height: 6px; background: var(--sunk); border-radius: 100px; overflow: hidden; margin-top: .25rem; }
+  .bar-fill { height: 100%; background: var(--tech); border-radius: 100px; }
+  .stage-row.held .bar-fill { background: var(--warn); }
+  .stage-count { text-align: right; font-weight: 700; font-size: .9rem; }
+  .held-tag { font-size: .62rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--warn); }
+
+  /* drawer */
+  .backdrop { position: fixed; inset: 0; background: rgba(8,14,20,.5); z-index: 40; }
+  .drawer {
+    position: fixed; top: 0; right: 0; bottom: 0; width: min(620px, 100%);
+    background: var(--surface); border-left: 1px solid var(--line); z-index: 50;
+    display: flex; flex-direction: column; box-shadow: -20px 0 50px -30px rgba(0,0,0,.6);
+  }
+  .drawer-head { padding: 1.1rem 1.3rem; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: .7rem; }
+  .drawer-head h3 { font-size: 1rem; flex: 1 1 auto; }
+  .drawer-body { flex: 1 1 auto; overflow-y: auto; padding: 1.3rem; }
+  .drawer-foot { padding: 1rem 1.3rem; border-top: 1px solid var(--line); display: flex; gap: .6rem; flex-wrap: wrap; }
+  .drawer-foot .approve { background: var(--done); border-color: var(--done); color: #fff; font-weight: 600; }
+  .drawer-foot .reject { background: var(--critical-soft); border-color: var(--critical); color: var(--critical); font-weight: 600; }
+  .field { margin-bottom: 1.2rem; }
+  .field .lbl { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-faint); margin-bottom: .3rem; }
+  .field pre { margin: 0; white-space: pre-wrap; word-break: break-word; background: var(--sunk); border: 1px solid var(--line); border-radius: 7px; padding: .8rem; font-size: .86rem; max-height: 320px; overflow-y: auto; }
+  .checklist { list-style: none; margin: 0; padding: 0; }
+  .checklist li { display: flex; align-items: center; gap: .5rem; padding: .35rem 0; font-size: .88rem; border-bottom: 1px solid var(--line); }
+  .checklist li:last-child { border-bottom: none; }
+  .check { font-weight: 700; }
+  .check.yes { color: var(--done); }
+  .check.no { color: var(--critical); }
+
+  /* toast */
+  #toast { position: fixed; left: 50%; bottom: 1.5rem; transform: translateX(-50%); z-index: 60; display: flex; flex-direction: column; gap: .5rem; align-items: center; }
+  .toast { background: var(--ink); color: var(--ground); padding: .55rem 1rem; border-radius: 7px; font-size: .86rem; box-shadow: var(--shadow); }
+  .toast.bad { background: var(--critical); color: #fff; }
+  [hidden] { display: none !important; }
+  @media (max-width: 620px) { .bar { gap: .6rem; } .brand { width: 100%; } }
+</style>
+</head>
+<body>
+
+<div id="login">
+  <form id="login-form">
+    <h1>Pom Pom Hollow</h1>
+    <p>Production operations</p>
+    <label for="email">Email</label>
+    <input id="email" type="email" value="admin@example.com" autocomplete="username" required>
+    <label for="password">Password</label>
+    <input id="password" type="password" value="admin123" autocomplete="current-password" required>
+    <button type="submit">Sign in</button>
+    <p id="login-error" style="color:var(--critical);margin:.9rem 0 0;font-size:.84rem" hidden></p>
+  </form>
+</div>
+
+<div id="app" hidden>
+  <header>
+    <div class="wrap bar">
+      <div class="brand">Pom Pom Hollow<small>Production operations</small></div>
+      <span id="pipeline-state" class="state running"><span class="dot"></span><span id="state-text">Running</span></span>
+      <button id="toggle-run" class="stop">Stop production</button>
+      <span class="who" id="who"></span>
+      <button id="sign-out">Sign out</button>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section>
+      <div class="sec-title"><h2>Needs you</h2><span class="count-pill" id="needs-count">0</span></div>
+      <div id="needs"></div>
+    </section>
+
+    <section>
+      <div class="tiles">
+        <div class="tile"><div class="k">In flight</div><div class="v" id="t-inflight">—</div></div>
+        <div class="tile"><div class="k">Awaiting review</div><div class="v" id="t-review">—</div></div>
+        <div class="tile"><div class="k">Failed</div><div class="v" id="t-failed">—</div></div>
+        <div class="tile"><div class="k">Working now</div><div class="v" id="t-claimed">—</div></div>
+        <div class="tile"><div class="k">Published</div><div class="v" id="t-published">—</div></div>
+      </div>
+    </section>
+
+    <section>
+      <div class="sec-title"><h2>Failed</h2><span class="count-pill" id="failed-count">0</span></div>
+      <div id="failed"></div>
+    </section>
+
+    <section>
+      <div class="sec-title"><h2>Gone quiet</h2><span class="count-pill" id="stuck-count">0</span></div>
+      <div id="stuck"></div>
+    </section>
+
+    <section>
+      <div class="sec-title"><h2>Pipeline</h2></div>
+      <div class="stages" id="stages"></div>
+    </section>
+  </main>
+</div>
+
+<div id="drawer-host"></div>
+<div id="toast"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  const TOKEN_KEY = "pph.token";
+  const USER_KEY = "pph.user";
+  const REFRESH_MS = 5000;
+
+  let token = sessionStorage.getItem(TOKEN_KEY) || "";
+  let user = sessionStorage.getItem(USER_KEY) || "";
+  let paused = false;
+  let timer = null;
+
+  const $ = (id) => document.getElementById(id);
+
+  // Every value below comes from the API and may contain script text an LLM
+  // produced, so it is only ever written as text, never as markup.
+  function el(tag, props = {}, children = []) {
+    const node = document.createElement(tag);
+    for (const [key, value] of Object.entries(props)) {
+      if (key === "class") node.className = value;
+      else if (key === "text") node.textContent = value;
+      else if (key.startsWith("on")) node.addEventListener(key.slice(2), value);
+      else node.setAttribute(key, value);
+    }
+    for (const child of [].concat(children)) {
+      if (child) node.appendChild(child);
+    }
+    return node;
+  }
+
+  function toast(message, bad = false) {
+    const node = el("div", { class: "toast" + (bad ? " bad" : ""), text: message });
+    $("toast").appendChild(node);
+    setTimeout(() => node.remove(), bad ? 6000 : 3000);
+  }
+
+  async function api(method, path, body) {
+    const res = await fetch(path, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: "Bearer " + token } : {}),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+
+    if (res.status === 401) {
+      signOut();
+      throw new Error("Session expired, sign in again");
+    }
+    if (res.status === 204) return null;
+
+    const text = await res.text();
+    const payload = text ? JSON.parse(text) : null;
+    if (!res.ok) {
+      throw new Error((payload && (payload.message || payload.error)) || res.statusText);
+    }
+    return payload;
+  }
+
+  /* ---------- auth ---------- */
+
+  $("login-form").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    $("login-error").hidden = true;
+    try {
+      const res = await fetch("/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: $("email").value, password: $("password").value }),
+      });
+      if (!res.ok) throw new Error("Those credentials were not accepted");
+      const data = await res.json();
+      token = data.token;
+      user = $("email").value;
+      sessionStorage.setItem(TOKEN_KEY, token);
+      sessionStorage.setItem(USER_KEY, user);
+      start();
+    } catch (err) {
+      $("login-error").textContent = err.message;
+      $("login-error").hidden = false;
+    }
+  });
+
+  function signOut() {
+    token = "";
+    sessionStorage.removeItem(TOKEN_KEY);
+    sessionStorage.removeItem(USER_KEY);
+    clearInterval(timer);
+    $("app").hidden = true;
+    $("login").hidden = false;
+  }
+  $("sign-out").addEventListener("click", signOut);
+
+  /* ---------- stop switch ---------- */
+
+  $("toggle-run").addEventListener("click", async () => {
+    try {
+      if (paused) {
+        await api("POST", "/pipeline/control/resume", { scope: "ALL" });
+        toast("Production resumed");
+      } else {
+        const reason = prompt("Why are you stopping production?", "") ?? "";
+        await api("POST", "/pipeline/control/pause", { scope: "ALL", reason });
+        toast("Production stopped");
+      }
+      await refresh();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  });
+
+  /* ---------- review drawer ---------- */
+
+  function closeDrawer() { $("drawer-host").replaceChildren(); }
+
+  async function openReview(episode, gate) {
+    const isGate1 = gate === "GATE_1_SCRIPT";
+    const body = el("div", { class: "drawer-body" });
+
+    body.appendChild(field("Episode", `${episode.code} — ${episode.title}`));
+    if (episode.synopsis) body.appendChild(field("Synopsis", episode.synopsis));
+
+    if (isGate1) {
+      body.appendChild(field("Script", episode.script_text || "(the script agent has not written one yet)", true));
+      body.appendChild(field("Song", episode.song_lyrics || "(no lyrics yet)", true));
+    } else {
+      // Gate 2 is the compliance checkpoint, so what is being certified is
+      // shown rather than left to the reviewer to remember.
+      const checks = el("ul", { class: "checklist" }, [
+        check("Marked made for kids", episode.made_for_kids),
+        check("AI generation disclosed", episode.ai_disclosure),
+        check("Duration recorded", episode.duration_seconds > 0,
+              episode.duration_seconds ? episode.duration_seconds + "s" : "not set"),
+      ]);
+      body.appendChild(el("div", { class: "field" }, [
+        el("div", { class: "lbl", text: "Compliance" }), checks,
+      ]));
+
+      const assetBox = el("pre", { text: "Loading assets…" });
+      body.appendChild(el("div", { class: "field" }, [
+        el("div", { class: "lbl", text: "Assets produced" }), assetBox,
+      ]));
+      try {
+        const assets = await api("GET", `/pipeline/episodes/${episode.id}/assets`);
+        assetBox.textContent = assets && assets.length
+          ? assets.map((a) => `${a.kind}  ${a.uri}`).join("\n")
+          : "No assets were recorded for this episode.";
+      } catch (err) {
+        assetBox.textContent = "Could not load assets: " + err.message;
+      }
+    }
+
+    const notes = el("textarea", { rows: "3", placeholder: "Notes (recorded either way)" });
+    body.appendChild(el("div", { class: "field" }, [
+      el("div", { class: "lbl", text: "Notes" }), notes,
+    ]));
+
+    const decide = async (decision) => {
+      try {
+        await api("POST", `/pipeline/episodes/${episode.id}/approvals`, {
+          gate, decision, notes: notes.value,
+        });
+        toast(`${episode.code} ${decision === "APPROVED" ? "approved" : "sent back for rework"}`);
+        closeDrawer();
+        await refresh();
+      } catch (err) {
+        toast(err.message, true);
+      }
+    };
+
+    const drawer = el("div", { class: "drawer" }, [
+      el("div", { class: "drawer-head" }, [
+        el("h3", { text: isGate1 ? "Gate 1 — script review" : "Gate 2 — release review" }),
+        el("button", { text: "Close", onclick: closeDrawer }),
+      ]),
+      body,
+      el("div", { class: "drawer-foot" }, [
+        el("button", { class: "approve", text: "Approve", onclick: () => decide("APPROVED") }),
+        el("button", { class: "reject", text: "Send back", onclick: () => decide("REJECTED") }),
+      ]),
+    ]);
+
+    $("drawer-host").replaceChildren(
+      el("div", { class: "backdrop", onclick: closeDrawer }),
+      drawer,
+    );
+  }
+
+  function field(label, value, wide = false) {
+    return el("div", { class: "field" }, [
+      el("div", { class: "lbl", text: label }),
+      wide ? el("pre", { text: value }) : el("div", { text: value }),
+    ]);
+  }
+
+  function check(label, ok, detail) {
+    return el("li", {}, [
+      el("span", { class: "check " + (ok ? "yes" : "no"), text: ok ? "✓" : "✗" }),
+      el("span", { text: label }),
+      detail ? el("span", { class: "mono", style: "margin-left:auto;color:var(--ink-faint);font-size:.8rem", text: detail }) : null,
+    ]);
+  }
+
+  /* ---------- rendering ---------- */
+
+  function renderNeeds(episodes) {
+    $("needs-count").textContent = episodes.length;
+    $("needs-count").className = "count-pill" + (episodes.length ? " hot" : "");
+
+    if (!episodes.length) {
+      $("needs").replaceChildren(el("div", { class: "empty", text: "Nothing is waiting on you." }));
+      return;
+    }
+
+    $("needs").replaceChildren(...episodes.map((episode) => {
+      const gate = episode.status === "SCRIPT_DRAFT" ? "GATE_1_SCRIPT" : "GATE_2_RELEASE";
+      const isGate1 = gate === "GATE_1_SCRIPT";
+      return el("div", { class: "card attention" }, [
+        el("div", { class: "card-top" }, [
+          el("span", { class: "code mono", text: episode.code }),
+          el("span", { class: "title", text: episode.title }),
+          el("span", { class: "badge " + (isGate1 ? "g1" : "g2"), text: isGate1 ? "Gate 1 · script" : "Gate 2 · release" }),
+          el("button", { text: "Review", onclick: () => openReview(episode, gate) }),
+        ]),
+      ]);
+    }));
+  }
+
+  function renderFailed(episodes) {
+    $("failed-count").textContent = episodes.length;
+    if (!episodes.length) {
+      $("failed").replaceChildren(el("div", { class: "empty", text: "Nothing has failed." }));
+      return;
+    }
+
+    $("failed").replaceChildren(...episodes.map((episode) => el("div", { class: "card broken" }, [
+      el("div", { class: "card-top" }, [
+        el("span", { class: "code mono", text: episode.code }),
+        el("span", { class: "title", text: episode.title }),
+        el("span", { class: "badge err", text: "broke at " + (episode.failed_from || "unknown") }),
+        el("button", { text: "Retry", onclick: () => retry(episode) }),
+      ]),
+      el("div", { class: "meta", text: episode.last_error || "No error was recorded." }),
+    ])));
+  }
+
+  function renderStuck(episodes) {
+    $("stuck-count").textContent = episodes.length;
+    if (!episodes.length) {
+      $("stuck").replaceChildren(el("div", { class: "empty", text: "Everything is moving." }));
+      return;
+    }
+
+    $("stuck").replaceChildren(...episodes.map((episode) => el("div", { class: "card quiet" }, [
+      el("div", { class: "card-top" }, [
+        el("span", { class: "code mono", text: episode.code }),
+        el("span", { class: "title", text: episode.title }),
+        el("span", { class: "badge", text: episode.status }),
+      ]),
+      el("div", { class: "meta", text: "Untouched since " + new Date(episode.updated_at).toLocaleString() }),
+    ])));
+  }
+
+  function renderStages(stages) {
+    const busiest = Math.max(1, ...stages.map((s) => s.count));
+    $("stages").replaceChildren(...stages.map((stage) => {
+      const row = el("div", { class: "stage-row" + (stage.count ? "" : " zero") + (stage.paused ? " held" : "") }, [
+        el("div", {}, [
+          el("div", { class: "stage-name" }, [
+            el("span", { class: "nm mono", text: stage.status }),
+            stage.paused ? el("span", { class: "held-tag", text: "held" }) : null,
+          ]),
+          el("div", { class: "bar-track" }, [
+            el("div", { class: "bar-fill", style: `width:${(stage.count / busiest) * 100}%` }),
+          ]),
+        ]),
+        el("div", { class: "stage-count mono", text: String(stage.count) }),
+      ]);
+      return row;
+    }));
+  }
+
+  async function retry(episode) {
+    try {
+      await api("POST", `/pipeline/episodes/${episode.id}/retry`);
+      toast(`${episode.code} put back to ${episode.failed_from}`);
+      await refresh();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+
+  /* ---------- refresh loop ---------- */
+
+  async function refresh() {
+    const [overview, pending, failed] = await Promise.all([
+      api("GET", "/pipeline/overview"),
+      api("GET", "/pipeline/reviews/pending"),
+      api("GET", "/pipeline/episodes?status=FAILED"),
+    ]);
+
+    paused = overview.paused;
+    $("pipeline-state").className = "state " + (paused ? "paused" : "running");
+    $("state-text").textContent = paused
+      ? "Paused" + (overview.pause_reason ? " — " + overview.pause_reason : "")
+      : "Running";
+    $("toggle-run").textContent = paused ? "Resume production" : "Stop production";
+    $("toggle-run").className = paused ? "start" : "stop";
+
+    $("t-inflight").textContent = overview.in_flight;
+    $("t-review").textContent = overview.awaiting_review;
+    $("t-failed").textContent = overview.failed;
+    $("t-failed").className = "v" + (overview.failed ? " alert" : "");
+    $("t-claimed").textContent = overview.claimed_now;
+    $("t-published").textContent = overview.published_total;
+
+    renderNeeds(pending || []);
+    renderFailed(failed || []);
+    renderStuck(overview.stuck || []);
+    renderStages(overview.stages || []);
+  }
+
+  async function tick() {
+    try {
+      await refresh();
+    } catch (err) {
+      // A blip must not stop the dashboard updating; it retries next tick.
+      console.error(err);
+    }
+  }
+
+  function start() {
+    $("login").hidden = true;
+    $("app").hidden = false;
+    $("who").textContent = user;
+    tick();
+    clearInterval(timer);
+    timer = setInterval(tick, REFRESH_MS);
+  }
+
+  if (token) start();
+})();
+</script>
+</body>
+</html>
