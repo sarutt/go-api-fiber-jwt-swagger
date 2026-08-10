@@ -65,7 +65,9 @@ func raiseAlert(kind string, episodeID uint, stage EpisodeStatus, message string
 		return
 	}
 
-	go deliverAlert(alert)
+	// The connection is captured rather than read again inside the goroutine:
+	// delivery outlives the call, and tests swap the global between cases.
+	go deliverAlert(db, alert)
 }
 
 // resolveAlerts closes any open alert for an episode whose condition has
@@ -116,7 +118,7 @@ func gateWaitingAt(status EpisodeStatus) bool {
 // deliverAlert pushes one alert to the configured webhook. The payload has a
 // text field so it works with Slack and Discord unchanged, and the full alert
 // alongside it for anything that wants structure.
-func deliverAlert(alert Alert) {
+func deliverAlert(tx *gorm.DB, alert Alert) {
 	url := alertWebhookURL()
 	if url == "" {
 		return
@@ -144,7 +146,7 @@ func deliverAlert(alert Alert) {
 		return
 	}
 	now := time.Now()
-	db.Model(&Alert{}).Where("id = ?", alert.ID).Update("delivered_at", now)
+	tx.Model(&Alert{}).Where("id = ?", alert.ID).Update("delivered_at", now)
 }
 
 // startAlertSweeper watches for episodes that have gone quiet. The other two
