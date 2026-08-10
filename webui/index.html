@@ -103,6 +103,23 @@
   .card .meta { font-size: .82rem; color: var(--ink-soft); margin-top: .35rem; }
   .empty { color: var(--ink-faint); font-size: .88rem; padding: .9rem 0; }
 
+  /* alerts */
+  .alerts { border: 1px solid var(--line); border-radius: 9px; overflow: hidden; background: var(--surface); }
+  .alert-row { display: flex; align-items: center; gap: .7rem; padding: .6rem 1rem; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+  .alert-row:last-child { border-bottom: none; }
+  .alert-row .msg { flex: 1 1 240px; min-width: 0; font-size: .88rem; }
+  .alert-row .when { font-size: .76rem; color: var(--ink-faint); }
+  .badge.k-GATE_WAITING { background: var(--accent); color: #fff; }
+  .badge.k-FAILED { background: var(--critical-soft); color: var(--critical); }
+  .badge.k-STUCK { background: var(--warn-soft); color: var(--warn); }
+  .undelivered { font-size: .72rem; color: var(--warn); font-weight: 600; }
+
+  /* asset list */
+  .assets { list-style: none; margin: 0; padding: 0; }
+  .assets li { display: flex; align-items: center; gap: .6rem; padding: .4rem 0; border-bottom: 1px solid var(--line); font-size: .86rem; }
+  .assets li:last-child { border-bottom: none; }
+  .assets .size { margin-left: auto; color: var(--ink-faint); font-size: .78rem; }
+
   /* stages */
   .stages { background: var(--surface); border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
   .stage-row { display: grid; grid-template-columns: 1fr 3rem; align-items: center; gap: .8rem; padding: .4rem 1rem; border-bottom: 1px solid var(--line); }
@@ -174,6 +191,11 @@
   </header>
 
   <main class="wrap">
+    <section id="alerts-section" hidden>
+      <div class="sec-title"><h2>Alerts</h2><span class="count-pill hot" id="alerts-count">0</span></div>
+      <div class="alerts" id="alerts"></div>
+    </section>
+
     <section>
       <div class="sec-title"><h2>Needs you</h2><span class="count-pill" id="needs-count">0</span></div>
       <div id="needs"></div>
@@ -185,6 +207,7 @@
         <div class="tile"><div class="k">Awaiting review</div><div class="v" id="t-review">—</div></div>
         <div class="tile"><div class="k">Failed</div><div class="v" id="t-failed">—</div></div>
         <div class="tile"><div class="k">Working now</div><div class="v" id="t-claimed">—</div></div>
+        <div class="tile"><div class="k">Open alerts</div><div class="v" id="t-alerts">—</div></div>
         <div class="tile"><div class="k">Published</div><div class="v" id="t-published">—</div></div>
       </div>
     </section>
@@ -349,15 +372,17 @@
         el("div", { class: "lbl", text: "Compliance" }), checks,
       ]));
 
-      const assetBox = el("pre", { text: "Loading assets…" });
+      // Reviewing a release means watching the video, not reading a filename,
+      // so every stored asset opens.
+      const assetBox = el("div", { text: "Loading assets…" });
       body.appendChild(el("div", { class: "field" }, [
         el("div", { class: "lbl", text: "Assets produced" }), assetBox,
       ]));
       try {
         const assets = await api("GET", `/pipeline/episodes/${episode.id}/assets`);
-        assetBox.textContent = assets && assets.length
-          ? assets.map((a) => `${a.kind}  ${a.uri}`).join("\n")
-          : "No assets were recorded for this episode.";
+        assetBox.replaceChildren(assets && assets.length
+          ? el("ul", { class: "assets" }, assets.map(assetRow))
+          : el("div", { class: "empty", text: "No assets were recorded for this episode." }));
       } catch (err) {
         assetBox.textContent = "Could not load assets: " + err.message;
       }
@@ -406,6 +431,50 @@
     ]);
   }
 
+  function assetRow(asset) {
+    const stored = Boolean(asset.storage_key);
+    return el("li", {}, [
+      el("span", { class: "badge", text: asset.kind }),
+      el("span", { class: "mono", text: asset.uri }),
+      asset.size_bytes ? el("span", { class: "size mono", text: humanSize(asset.size_bytes) }) : null,
+      el("button", {
+        text: stored ? "Open" : "External",
+        style: stored ? "" : "margin-left:auto",
+        onclick: () => openAsset(asset),
+      }),
+    ]);
+  }
+
+  // The content endpoint is behind the same JWT as everything else, and an
+  // <a href> cannot carry the header — so the bytes are fetched and handed to
+  // the browser as a blob instead.
+  async function openAsset(asset) {
+    if (!asset.storage_key) {
+      window.open(asset.uri, "_blank", "noopener");
+      return;
+    }
+    try {
+      const res = await fetch(`/pipeline/assets/${asset.id}/content`, {
+        headers: { Authorization: "Bearer " + token },
+      });
+      if (!res.ok) throw new Error("The asset could not be opened (" + res.status + ")");
+      const url = URL.createObjectURL(await res.blob());
+      window.open(url, "_blank", "noopener");
+      // Long enough for the tab to load it, short enough not to hold the file
+      // in memory for the rest of the session.
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
+
+  function humanSize(bytes) {
+    const units = ["B", "KB", "MB", "GB"];
+    let size = bytes, unit = 0;
+    while (size >= 1024 && unit < units.length - 1) { size /= 1024; unit++; }
+    return (unit === 0 ? size : size.toFixed(1)) + " " + units[unit];
+  }
+
   function check(label, ok, detail) {
     return el("li", {}, [
       el("span", { class: "check " + (ok ? "yes" : "no"), text: ok ? "✓" : "✗" }),
@@ -415,6 +484,31 @@
   }
 
   /* ---------- rendering ---------- */
+
+  // Alerts are what the pipeline pushed at the operator. They sit above
+  // everything else because they are the reason to have opened the page.
+  function renderAlerts(alerts) {
+    $("alerts-section").hidden = alerts.length === 0;
+    $("alerts-count").textContent = alerts.length;
+    if (!alerts.length) return;
+
+    $("alerts").replaceChildren(...alerts.map((alert) => el("div", { class: "alert-row" }, [
+      el("span", { class: "badge k-" + alert.kind, text: alert.kind.replace("_", " ") }),
+      el("span", { class: "msg", text: alert.message }),
+      alert.delivered_at ? null : el("span", { class: "undelivered", text: "not delivered" }),
+      el("span", { class: "when", text: new Date(alert.created_at).toLocaleString() }),
+      el("button", { text: "Acknowledge", onclick: () => acknowledge(alert) }),
+    ])));
+  }
+
+  async function acknowledge(alert) {
+    try {
+      await api("POST", `/pipeline/alerts/${alert.id}/ack`);
+      await refresh();
+    } catch (err) {
+      toast(err.message, true);
+    }
+  }
 
   function renderNeeds(episodes) {
     $("needs-count").textContent = episodes.length;
@@ -506,10 +600,11 @@
   /* ---------- refresh loop ---------- */
 
   async function refresh() {
-    const [overview, pending, failed] = await Promise.all([
+    const [overview, pending, failed, alerts] = await Promise.all([
       api("GET", "/pipeline/overview"),
       api("GET", "/pipeline/reviews/pending"),
       api("GET", "/pipeline/episodes?status=FAILED"),
+      api("GET", "/pipeline/alerts"),
     ]);
 
     paused = overview.paused;
@@ -525,8 +620,11 @@
     $("t-failed").textContent = overview.failed;
     $("t-failed").className = "v" + (overview.failed ? " alert" : "");
     $("t-claimed").textContent = overview.claimed_now;
+    $("t-alerts").textContent = overview.open_alerts;
+    $("t-alerts").className = "v" + (overview.open_alerts ? " alert" : "");
     $("t-published").textContent = overview.published_total;
 
+    renderAlerts(alerts || []);
     renderNeeds(pending || []);
     renderFailed(failed || []);
     renderStuck(overview.stuck || []);

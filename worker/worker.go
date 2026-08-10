@@ -18,7 +18,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
+	"net/textproto"
 	"time"
 )
 
@@ -313,9 +315,9 @@ func (w *Worker) do(ctx context.Context, method, path string, body any, out any)
 }
 
 // Client is a small authenticated client for the pipeline API. The worker uses
-// it internally, and an agent that needs calls the loop does not make for it —
-// reading the show bible, say — can use the same one rather than rebuilding
-// request plumbing.
+// it internally, and an agent that needs calls the loop does not make — reading
+// the show bible, uploading a produced file — can build one with NewClient
+// rather than rebuilding the request plumbing.
 type Client struct {
 	BaseURL string
 	Token   string
@@ -333,6 +335,59 @@ func NewClient(baseURL, token string, httpClient *http.Client) *Client {
 		httpClient = &http.Client{Timeout: 30 * time.Second}
 	}
 	return &Client{BaseURL: baseURL, Token: token, HTTP: httpClient}
+}
+
+// Upload hands produced bytes to the pipeline, which stores them and returns
+// the recorded asset. Use this when the agent generated a file; use the plain
+// asset registration when the agent already hosts the file somewhere itself.
+//
+// The pipeline chooses the storage path, so filename is only a label — it
+// cannot influence where the bytes land.
+func (c *Client) Upload(ctx context.Context, episodeID uint, kind, filename, contentType string, r io.Reader, out any) error {
+	body := &bytes.Buffer{}
+	form := multipart.NewWriter(body)
+
+	if err := form.WriteField("kind", kind); err != nil {
+		return err
+	}
+	part, err := form.CreatePart(textproto.MIMEHeader{
+		"Content-Disposition": []string{fmt.Sprintf(`form-data; name="file"; filename=%q`, filename)},
+		"Content-Type":        []string{contentType},
+	})
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(part, r); err != nil {
+		return err
+	}
+	if err := form.Close(); err != nil {
+		return err
+	}
+
+	path := fmt.Sprintf("%s/pipeline/episodes/%d/assets/upload", c.BaseURL, episodeID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, path, body)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", form.FormDataContentType())
+	if c.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
+	}
+
+	res, err := c.HTTP.Do(req)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	if res.StatusCode >= 300 {
+		payload, _ := io.ReadAll(io.LimitReader(res.Body, 2048))
+		return fmt.Errorf("uploading %s: %s: %s", kind, res.Status, bytes.TrimSpace(payload))
+	}
+	if out != nil {
+		return json.NewDecoder(res.Body).Decode(out)
+	}
+	return nil
 }
 
 // Do performs one API call, decoding a JSON response into out when given. It

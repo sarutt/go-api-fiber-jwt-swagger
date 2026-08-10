@@ -28,6 +28,8 @@ func registerPipelineRoutes(app *fiber.App) {
 	// Operator controls. Pausing production, and rescuing a failed episode,
 	// are deliberately admin-only: they change what the whole system does.
 	pipeline.Get("/overview", getOverview)
+	pipeline.Get("/alerts", getAlerts)
+	pipeline.Post("/alerts/:id/ack", acknowledgeAlert)
 	pipeline.Get("/control", getControl)
 	pipeline.Post("/control/pause", requireRole(RoleAdmin), pausePipeline)
 	pipeline.Post("/control/resume", requireRole(RoleAdmin), resumePipeline)
@@ -43,6 +45,8 @@ func registerPipelineRoutes(app *fiber.App) {
 	// Files produced by the generation agents.
 	pipeline.Get("/episodes/:id/assets", getEpisodeAssets)
 	pipeline.Post("/episodes/:id/assets", createAsset)
+	pipeline.Post("/episodes/:id/assets/upload", uploadAsset)
+	pipeline.Get("/assets/:id/content", getAssetContent)
 	pipeline.Delete("/assets/:id", deleteAsset)
 
 	// Show bible: cast, sets and the curriculum backlog.

@@ -1,5 +1,28 @@
 basePath: /
 definitions:
+  main.Alert:
+    properties:
+      acknowledged_at:
+        type: string
+      acknowledged_by:
+        type: string
+      created_at:
+        type: string
+      delivered_at:
+        type: string
+      episode_id:
+        type: integer
+      id:
+        type: integer
+      kind:
+        type: string
+      message:
+        type: string
+      resolved_at:
+        type: string
+      stage:
+        $ref: '#/definitions/main.EpisodeStatus'
+    type: object
   main.ApprovalLog:
     properties:
       created_at:
@@ -32,6 +55,8 @@ definitions:
     type: object
   main.Asset:
     properties:
+      content_type:
+        type: string
       created_at:
         type: string
       duration_seconds:
@@ -45,6 +70,10 @@ definitions:
       kind:
         $ref: '#/definitions/main.AssetKind'
       platform:
+        type: string
+      size_bytes:
+        type: integer
+      storage_key:
         type: string
       uri:
         type: string
@@ -309,6 +338,8 @@ definitions:
         type: integer
       in_flight:
         type: integer
+      open_alerts:
+        type: integer
       pause_reason:
         type: string
       paused:
@@ -395,8 +426,60 @@ paths:
       summary: Get all books
       tags:
       - books
+  /pipeline/alerts:
+    get:
+      description: What the pipeline has flagged for a person. Defaults to open alerts;
+        pass ?all=true for the history.
+      parameters:
+      - description: Include resolved and acknowledged alerts
+        in: query
+        name: all
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.Alert'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List alerts
+      tags:
+      - pipeline-control
+  /pipeline/alerts/{id}/ack:
+    post:
+      description: Marks an alert as seen. Distinct from resolved, which the pipeline
+        sets by itself once the condition passes — acknowledging says a person looked,
+        not that the problem went away.
+      parameters:
+      - description: Alert ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Alert'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Acknowledge an alert
+      tags:
+      - pipeline-control
   /pipeline/assets/{id}:
     delete:
+      description: Removes the record and, when the pipeline stored the file, the
+        file itself.
       parameters:
       - description: Asset ID
         in: path
@@ -415,6 +498,32 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Delete an asset
+      tags:
+      - pipeline-assets
+  /pipeline/assets/{id}/content:
+    get:
+      description: Serves a file the pipeline stores. Assets registered as a URI the
+        agent hosts elsewhere have nothing to serve and return 404.
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Download an asset
       tags:
       - pipeline-assets
   /pipeline/characters:
@@ -992,6 +1101,78 @@ paths:
       security:
       - ApiKeyAuth: []
       summary: Register a produced file against an episode
+      tags:
+      - pipeline-assets
+  /pipeline/episodes/{id}/assets/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: How a generation agent hands over bytes rather than a URI it hosts
+        itself. Creates the asset record and stores the file in one call. The storage
+        path is derived from the episode and asset, never from the uploaded filename.
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Asset kind
+        enum:
+        - SCRIPT
+        - VOICEOVER
+        - MUSIC
+        - ANIMATION
+        - MASTER_VIDEO
+        - SHORTS_CUT
+        - TIKTOK_CUT
+        - THUMBNAIL
+        in: formData
+        name: kind
+        required: true
+        type: string
+      - description: Platform this cut targets
+        in: formData
+        name: platform
+        type: string
+      - description: Worker that produced it
+        in: formData
+        name: generated_by
+        type: string
+      - description: Duration, for audio and video
+        in: formData
+        name: duration_seconds
+        type: integer
+      - description: The file
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/main.Asset'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "415":
+          description: Unsupported Media Type
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Upload a produced file
       tags:
       - pipeline-assets
   /pipeline/episodes/{id}/events:

@@ -22,6 +22,10 @@ file is created and seeded with the show bible on first run.
 | `SECRET_KEY`           | — (required, `.env`) | JWT signing key               |
 | `DB_PATH`              | `pompomhollow.db`    | Pipeline database file        |
 | `CLAIM_LEASE_MINUTES`  | `15`                 | How long a worker holds a job |
+| `ASSET_DIR`            | `assets`             | Where produced files are stored |
+| `ASSET_MAX_MB`         | `512`                | Largest single upload accepted  |
+| `ALERT_WEBHOOK_URL`    | — (optional)         | Where alerts are pushed (Slack/Discord compatible) |
+| `ALERT_SWEEP_MINUTES`  | `15`                 | How often quiet episodes are looked for |
 
 Swagger UI: <http://localhost:8080/swagger/index.html>
 Regenerate docs after changing annotations: `swag init`
@@ -111,6 +115,37 @@ spending generation budget on every attempt.
 back at the stage it failed at with the attempt count cleared — so a fix to the
 underlying problem can be tried without recreating the episode.
 
+### Being told, rather than looking
+
+The console reports what needs attention, but a system one person runs cannot
+depend on that person having it open. Three things raise an alert:
+
+| Kind           | Raised when                                            |
+| -------------- | ------------------------------------------------------ |
+| `GATE_WAITING` | An episode reaches a review gate and stops             |
+| `FAILED`       | An episode is parked after exhausting its attempts     |
+| `STUCK`        | An episode has not moved for `stuckAfter` (24h)        |
+
+The first two fire on the transition itself. `STUCK` cannot — nothing happening
+is exactly why no event announces it — so a sweeper looks for quiet episodes
+every `ALERT_SWEEP_MINUTES`.
+
+Alerts **close themselves** when the condition passes: approving a gate,
+retrying a failure, or any move off the stage. An operator reading a board of
+alerts that are no longer true is worse off than one reading no board at all.
+A condition that persists is announced once, not on every sweep; a condition
+that genuinely recurs is announced again.
+
+Set `ALERT_WEBHOOK_URL` to have them pushed. The payload carries a `text` field,
+so a Slack or Discord incoming webhook works with no translation layer, and the
+full alert alongside it for anything that wants structure. Delivery is
+best-effort: a webhook that is down never fails the transition that triggered
+it, and the alert is still recorded and visible on the console.
+
+Acknowledging (`POST /pipeline/alerts/{id}/ack`) takes an alert off the board
+and records who looked. It is deliberately distinct from resolving, which the
+pipeline does by itself once the problem is actually gone.
+
 ## Writing an agent
 
 Agents are built on the `worker` package rather than reimplementing the loop.
@@ -141,6 +176,25 @@ agent.Run(ctx)
 The runtime talks HTTP and does not import the server's types, so an agent can
 live in its own repository. Cancelling the context stops a worker between
 jobs, so a shutdown never abandons a claim.
+
+An agent that produces a file rather than a URI uploads the bytes instead of
+registering a location:
+
+```go
+pipeline := worker.NewClient("http://localhost:8080", token, nil)
+
+var asset worker.Asset
+err := pipeline.Upload(ctx, episode.ID, "VOICEOVER", "line-01.mp3",
+    "audio/mpeg", audio, &asset)
+```
+
+The storage key is built by the server from the episode, kind and asset ID —
+never from the filename an agent sends — so a worker cannot choose where its
+bytes land. Content type must be one the pipeline stores (`415` otherwise) and
+the upload is capped at `ASSET_MAX_MB`. Files live under `ASSET_DIR` behind the
+same JWT as everything else; swapping in object storage means implementing the
+three-method store interface, and the `Asset` row does not change because its
+URI carries its own scheme.
 
 `cmd/demoworker` runs every automated stage with stub handlers, which is how
 the pipeline can be exercised end to end before any generation tooling exists:
@@ -302,11 +356,20 @@ does, and should not be simplified away.
 
 **Assets**
 
-| Method | Path                              | Purpose                  |
-| ------ | --------------------------------- | ------------------------ |
-| GET    | `/pipeline/episodes/{id}/assets`  | Files for an episode     |
-| POST   | `/pipeline/episodes/{id}/assets`  | Register a produced file |
-| DELETE | `/pipeline/assets/{id}`           | Delete an asset          |
+| Method | Path                                    | Purpose                                  |
+| ------ | --------------------------------------- | ---------------------------------------- |
+| GET    | `/pipeline/episodes/{id}/assets`        | Files for an episode                     |
+| POST   | `/pipeline/episodes/{id}/assets`        | Register a file the agent hosts itself   |
+| POST   | `/pipeline/episodes/{id}/assets/upload` | Upload a produced file (multipart)       |
+| GET    | `/pipeline/assets/{id}/content`         | Download the stored bytes                |
+| DELETE | `/pipeline/assets/{id}`                 | Delete an asset and its file             |
+
+**Alerts**
+
+| Method | Path                          | Purpose                                   |
+| ------ | ----------------------------- | ----------------------------------------- |
+| GET    | `/pipeline/alerts`            | Open alerts; `?all=true` for the history   |
+| POST   | `/pipeline/alerts/{id}/ack`   | Mark an alert as seen                      |
 
 **Show bible**
 
@@ -374,7 +437,5 @@ The scaffold is the orchestrator only. Still to come, per the roadmap:
 - Real credential storage, and one identity per agent rather than a shared
   account (see Roles above)
 - Pagination on the list endpoints
-- Alerting. The overview reports stuck and failed episodes, but nothing pushes
-  that to the operator — they have to look
 - Editing an episode from the console — it reviews and controls, but content
   is still changed through the API

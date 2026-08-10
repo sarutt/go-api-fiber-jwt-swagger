@@ -89,6 +89,7 @@ func createApproval(c *fiber.Ctx) error {
 	}
 
 	recordEvent(episode.ID, from, target, reviewer, fmt.Sprintf("%s %s", req.Gate, req.Decision))
+	alertOnTransition(&episode, from)
 	return c.Status(fiber.StatusCreated).JSON(approval)
 }
 

@@ -6,5 +6,8 @@
 # Uploaded files
 /uploads/
 
+# Produced assets (ASSET_DIR)
+/assets/
+
 # Build output
 /apifiber

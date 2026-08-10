@@ -240,6 +240,7 @@ func transitionEpisode(c *fiber.Ctx) error {
 	// identity, and only then to the stage's expected owner.
 	actor := valueOr(req.Actor, valueOr(currentSubject(c), stageOwners[from]))
 	recordEvent(episode.ID, from, req.ToStatus, actor, req.Note)
+	alertOnTransition(&episode, from)
 	return c.JSON(episode)
 }
 

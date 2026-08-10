@@ -105,6 +105,27 @@ type Episode struct {
 	UpdatedAt  time.Time     `json:"updated_at"`
 }
 
+// Alert is something the pipeline needs a person to know about. Resolved and
+// acknowledged mean different things: the pipeline sets ResolvedAt by itself
+// once the condition passes, while AcknowledgedAt records that a person
+// looked. An alert can be resolved without anyone ever seeing it, which is
+// the desired outcome for a problem that fixed itself.
+type Alert struct {
+	ID        uint          `json:"id" gorm:"primaryKey"`
+	Kind      string        `json:"kind" gorm:"index;size:32"`
+	EpisodeID uint          `json:"episode_id" gorm:"index"`
+	Stage     EpisodeStatus `json:"stage" gorm:"size:32"`
+	Message   string        `json:"message"`
+	// DedupeKey is unique among open alerts, so a condition that persists is
+	// announced once rather than on every sweep.
+	DedupeKey      string     `json:"-" gorm:"uniqueIndex:idx_alert_open,where:resolved_at IS NULL;size:120"`
+	CreatedAt      time.Time  `json:"created_at"`
+	DeliveredAt    *time.Time `json:"delivered_at"`
+	ResolvedAt     *time.Time `json:"resolved_at" gorm:"index"`
+	AcknowledgedAt *time.Time `json:"acknowledged_at"`
+	AcknowledgedBy string     `json:"acknowledged_by" gorm:"size:120"`
+}
+
 // PipelineControl is the admin's stop switch. One row per scope: the whole
 // pipeline, or a single stage.
 type PipelineControl struct {
@@ -161,12 +182,18 @@ type CurriculumTopic struct {
 }
 
 // Asset is a file produced for an episode by one of the generation agents.
+// Either the agent stored the bytes itself and registered a URI, or it
+// uploaded them and the pipeline holds them — StorageKey is set in the second
+// case and is what makes the content endpoint able to serve the file back.
 type Asset struct {
 	ID              uint      `json:"id" gorm:"primaryKey"`
 	EpisodeID       uint      `json:"episode_id" gorm:"index"`
 	Kind            AssetKind `json:"kind" gorm:"index;size:32"`
 	Platform        string    `json:"platform" gorm:"size:32"`
 	URI             string    `json:"uri"`
+	StorageKey      string    `json:"storage_key" gorm:"size:255"`
+	ContentType     string    `json:"content_type" gorm:"size:120"`
+	SizeBytes       int64     `json:"size_bytes"`
 	GeneratedBy     string    `json:"generated_by" gorm:"size:80"`
 	DurationSeconds int       `json:"duration_seconds"`
 	CreatedAt       time.Time `json:"created_at"`
@@ -246,6 +273,7 @@ type PipelineOverview struct {
 	ClaimedNow     int64        `json:"claimed_now"`
 	AwaitingReview int64        `json:"awaiting_review"`
 	Failed         int64        `json:"failed"`
+	OpenAlerts     int64        `json:"open_alerts"`
 	PublishedTotal int64        `json:"published_total"`
 	Stuck          []Episode    `json:"stuck"`
 }

@@ -184,6 +184,7 @@ func getOverview(c *fiber.Ctx) error {
 
 	cutoff := time.Now().Add(-claimLease())
 	db.Model(&Episode{}).Where("claimed_by <> ? AND claimed_at > ?", "", cutoff).Count(&overview.ClaimedNow)
+	overview.OpenAlerts = countOpenAlerts(db)
 
 	// Anything sitting untouched in an active stage for too long. A human
 	// gate counts: an episode nobody reviewed for a day is also stuck.
@@ -254,6 +255,7 @@ func failEpisode(c *fiber.Ctx) error {
 	}
 
 	recordEvent(episode.ID, from, episode.Status, workerID, note)
+	alertOnTransition(&episode, from)
 	return c.JSON(episode)
 }
 
@@ -298,5 +300,6 @@ func retryEpisode(c *fiber.Ctx) error {
 	}
 
 	recordEvent(episode.ID, from, episode.Status, currentSubject(c), "retried by operator")
+	alertOnTransition(&episode, from)
 	return c.JSON(episode)
 }

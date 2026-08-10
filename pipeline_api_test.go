@@ -33,7 +33,7 @@ func newTestAppAt(t *testing.T, path string) *fiber.App {
 		t.Fatalf("cannot set up test database: %v", err)
 	}
 
-	app := fiber.New()
+	app := fiber.New(fiber.Config{BodyLimit: bodyLimit()})
 	app.Use(jwtware.New(jwtware.Config{
 		SigningKey: []byte(testSecret),
 		ErrorHandler: func(c *fiber.Ctx, err error) error {

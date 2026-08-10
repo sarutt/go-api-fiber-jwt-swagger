@@ -46,6 +46,82 @@ const docTemplate = `{
                 }
             }
         },
+        "/pipeline/alerts": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "What the pipeline has flagged for a person. Defaults to open alerts; pass ?all=true for the history.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-control"
+                ],
+                "summary": "List alerts",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "Include resolved and acknowledged alerts",
+                        "name": "all",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Alert"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/alerts/{id}/ack": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Marks an alert as seen. Distinct from resolved, which the pipeline sets by itself once the condition passes — acknowledging says a person looked, not that the problem went away.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-control"
+                ],
+                "summary": "Acknowledge an alert",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Alert ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Alert"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/pipeline/assets/{id}": {
             "delete": {
                 "security": [
@@ -53,6 +129,7 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
+                "description": "Removes the record and, when the pipeline stored the file, the file itself.",
                 "produces": [
                     "application/json"
                 ],
@@ -72,6 +149,46 @@ const docTemplate = `{
                 "responses": {
                     "204": {
                         "description": "Deleted"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/assets/{id}/content": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Serves a file the pipeline stores. Assets registered as a URI the agent hosts elsewhere have nothing to serve and return 404.",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "pipeline-assets"
+                ],
+                "summary": "Download an asset",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Asset ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
                     },
                     "404": {
                         "description": "Not Found",
@@ -969,6 +1086,109 @@ const docTemplate = `{
                 }
             }
         },
+        "/pipeline/episodes/{id}/assets/upload": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "How a generation agent hands over bytes rather than a URI it hosts itself. Creates the asset record and stores the file in one call. The storage path is derived from the episode and asset, never from the uploaded filename.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-assets"
+                ],
+                "summary": "Upload a produced file",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "SCRIPT",
+                            "VOICEOVER",
+                            "MUSIC",
+                            "ANIMATION",
+                            "MASTER_VIDEO",
+                            "SHORTS_CUT",
+                            "TIKTOK_CUT",
+                            "THUMBNAIL"
+                        ],
+                        "type": "string",
+                        "description": "Asset kind",
+                        "name": "kind",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Platform this cut targets",
+                        "name": "platform",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Worker that produced it",
+                        "name": "generated_by",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Duration, for audio and video",
+                        "name": "duration_seconds",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "The file",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/main.Asset"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "415": {
+                        "description": "Unsupported Media Type",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/pipeline/episodes/{id}/events": {
             "get": {
                 "security": [
@@ -1556,6 +1776,41 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "main.Alert": {
+            "type": "object",
+            "properties": {
+                "acknowledged_at": {
+                    "type": "string"
+                },
+                "acknowledged_by": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "delivered_at": {
+                    "type": "string"
+                },
+                "episode_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "resolved_at": {
+                    "type": "string"
+                },
+                "stage": {
+                    "$ref": "#/definitions/main.EpisodeStatus"
+                }
+            }
+        },
         "main.ApprovalLog": {
             "type": "object",
             "properties": {
@@ -1605,6 +1860,9 @@ const docTemplate = `{
         "main.Asset": {
             "type": "object",
             "properties": {
+                "content_type": {
+                    "type": "string"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -1624,6 +1882,12 @@ const docTemplate = `{
                     "$ref": "#/definitions/main.AssetKind"
                 },
                 "platform": {
+                    "type": "string"
+                },
+                "size_bytes": {
+                    "type": "integer"
+                },
+                "storage_key": {
                     "type": "string"
                 },
                 "uri": {
@@ -1988,6 +2252,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "in_flight": {
+                    "type": "integer"
+                },
+                "open_alerts": {
                     "type": "integer"
                 },
                 "pause_reason": {

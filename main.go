@@ -25,7 +25,9 @@ import (
 // @name Authorization
 func main() {
 
-	app := fiber.New()
+	// Uploads are the only large requests; Fiber's 4MB default would refuse
+	// a master video long before the configured asset cap applied.
+	app := fiber.New(fiber.Config{BodyLimit: bodyLimit()})
 
 	// Apply CORS middleware
 	app.Use(cors.New(cors.Config{
@@ -50,6 +52,12 @@ func main() {
 
 	// Open the pipeline database and seed the show bible on first run
 	initDB()
+
+	// Where produced files live, and the watch for episodes that go quiet
+	if err := initStore(); err != nil {
+		log.Fatalf("cannot open the asset store: %v", err)
+	}
+	startAlertSweeper()
 
 	// Login route
 	app.Post("/login", login(secretKey))
