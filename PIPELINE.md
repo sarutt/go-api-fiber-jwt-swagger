@@ -143,8 +143,7 @@ live in its own repository. Cancelling the context stops a worker between
 jobs, so a shutdown never abandons a claim.
 
 `cmd/demoworker` runs every automated stage with stub handlers, which is how
-the pipeline can be exercised end to end before any model or render tooling
-exists:
+the pipeline can be exercised end to end before any generation tooling exists:
 
 ```bash
 go run .                  # the pipeline
@@ -153,6 +152,45 @@ go run ./cmd/demoworker   # nine stub workers
 
 Create an episode and the workers carry it to the first gate and stop, because
 approving is a person's job. Approve it and they pick it up again on their own.
+
+## The script agent
+
+`cmd/scriptagent` is the first real agent. It serves `IDEA_BACKLOG`: takes the
+next curriculum topic, writes a script and song with Claude, and hands the
+episode to Gate 1.
+
+```bash
+export ANTHROPIC_API_KEY=sk-ant-...
+go run ./cmd/scriptagent
+
+# and stop the stub from competing for the same stage
+go run ./cmd/demoworker -skip IDEA_BACKLOG
+```
+
+Two things about it are deliberate:
+
+**The prompt is built from the show bible, not from a constant.** The cast and
+sets are read from `/pipeline/characters` and `/pipeline/locations` on every
+run, so editing a character in the bible changes the next script with no code
+change, and the prompt cannot quietly fall out of step with the show. Inactive
+characters are left out.
+
+**The draft is validated before it is saved.** A script naming a character or
+set that is not in the bible, missing one of the six beats, repeating a beat,
+or arriving without a song is rejected as a failed attempt — so it is retried
+and eventually parked in `FAILED`, rather than becoming a reviewer's problem.
+The model is also constrained by a JSON schema, so there is no malformed
+output to repair.
+
+The curriculum topic is retired only after the script is saved: a failure
+part-way through leaves the topic available for the retry rather than burning
+it.
+
+| Flag | Default | Purpose |
+| ---- | ------- | ------- |
+| `-model` | `claude-opus-5` | Model to write with |
+| `-effort` | `high` | `low`, `medium`, `high`, `xhigh` or `max` |
+| `-worker-id` | `script-agent-1` | Must be unique per process |
 
 ## The state machine
 

@@ -51,7 +51,18 @@ func main() {
 	email := flag.String("email", "agent@example.com", "account to log in as")
 	password := flag.String("password", "agent123", "account password")
 	poll := flag.Duration("poll", 2*time.Second, "how often to look for work")
+	skip := flag.String("skip", "", "comma-separated stages to leave to a real agent, e.g. IDEA_BACKLOG")
 	flag.Parse()
+
+	// A stage served by a real agent must not also be served by a stub, or the
+	// two race for the same episodes and whichever claims first decides
+	// whether the work is real.
+	skipped := map[string]bool{}
+	for _, stage := range strings.Split(*skip, ",") {
+		if stage = strings.TrimSpace(stage); stage != "" {
+			skipped[strings.ToUpper(stage)] = true
+		}
+	}
 
 	token, err := login(*baseURL, *email, *password)
 	if err != nil {
@@ -63,8 +74,13 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	started := 0
 	for _, stage := range stages {
 		stage := stage
+		if skipped[stage.from] {
+			log.Printf("leaving %s to a real agent", stage.from)
+			continue
+		}
 		agent, err := worker.New(worker.Config{
 			BaseURL:      *baseURL,
 			Token:        token,
@@ -78,9 +94,10 @@ func main() {
 			log.Fatalf("cannot start the %s worker: %v", stage.from, err)
 		}
 		go agent.Run(ctx)
+		started++
 	}
 
-	log.Printf("%d demo workers running; the two human gates are left for a person", len(stages))
+	log.Printf("%d demo workers running; the two human gates are left for a person", started)
 	log.Print("press ctrl-c to stop")
 	<-ctx.Done()
 	log.Print("stopping")

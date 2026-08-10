@@ -307,9 +307,38 @@ func (w *Worker) reportFailure(ctx context.Context, episodeID uint, cause error)
 	return nil
 }
 
-// do performs one API call. It returns the status code even on error so the
-// caller can tell a pause from a genuine problem.
+// do performs one API call through the worker's client.
 func (w *Worker) do(ctx context.Context, method, path string, body any, out any) (int, error) {
+	return w.client().Do(ctx, method, path, body, out)
+}
+
+// Client is a small authenticated client for the pipeline API. The worker uses
+// it internally, and an agent that needs calls the loop does not make for it —
+// reading the show bible, say — can use the same one rather than rebuilding
+// request plumbing.
+type Client struct {
+	BaseURL string
+	Token   string
+	HTTP    *http.Client
+}
+
+// client exposes the worker's own configuration as a Client.
+func (w *Worker) client() *Client {
+	return &Client{BaseURL: w.config.BaseURL, Token: w.config.Token, HTTP: w.config.HTTPClient}
+}
+
+// NewClient builds a pipeline client. A nil http.Client gets a sane default.
+func NewClient(baseURL, token string, httpClient *http.Client) *Client {
+	if httpClient == nil {
+		httpClient = &http.Client{Timeout: 30 * time.Second}
+	}
+	return &Client{BaseURL: baseURL, Token: token, HTTP: httpClient}
+}
+
+// Do performs one API call, decoding a JSON response into out when given. It
+// returns the status code even on error so the caller can tell a deliberate
+// refusal — a pause, say — from a genuine problem.
+func (c *Client) Do(ctx context.Context, method, path string, body any, out any) (int, error) {
 	var reader io.Reader
 	if body != nil {
 		encoded, err := json.Marshal(body)
@@ -319,16 +348,16 @@ func (w *Worker) do(ctx context.Context, method, path string, body any, out any)
 		reader = bytes.NewReader(encoded)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, method, w.config.BaseURL+path, reader)
+	req, err := http.NewRequestWithContext(ctx, method, c.BaseURL+path, reader)
 	if err != nil {
 		return 0, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if w.config.Token != "" {
-		req.Header.Set("Authorization", "Bearer "+w.config.Token)
+	if c.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+c.Token)
 	}
 
-	res, err := w.config.HTTPClient.Do(req)
+	res, err := c.HTTP.Do(req)
 	if err != nil {
 		return 0, err
 	}
