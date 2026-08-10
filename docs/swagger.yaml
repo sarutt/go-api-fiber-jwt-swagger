@@ -105,6 +105,13 @@ definitions:
       voice_profile_id:
         type: string
     type: object
+  main.ClaimRequest:
+    properties:
+      status:
+        $ref: '#/definitions/main.EpisodeStatus'
+      worker_id:
+        type: string
+    type: object
   main.CurriculumTopic:
     properties:
       created_at:
@@ -130,6 +137,15 @@ definitions:
     properties:
       ai_disclosure:
         type: boolean
+      claimed_at:
+        type: string
+      claimed_by:
+        description: |-
+          ClaimedBy is the worker currently holding this episode, and ClaimedAt
+          is when it took it. The claim is a lease: it expires so a worker that
+          dies mid-job does not strand the episode. Both are cleared whenever the
+          episode changes stage.
+        type: string
       code:
         type: string
       created_at:
@@ -263,6 +279,13 @@ definitions:
         type: string
       to_status:
         $ref: '#/definitions/main.EpisodeStatus'
+      worker_id:
+        type: string
+    type: object
+  main.WorkerRequest:
+    properties:
+      worker_id:
+        type: string
     type: object
 host: localhost:8080
 info:
@@ -828,6 +851,83 @@ paths:
       summary: Get the stage history of an episode
       tags:
       - pipeline-episodes
+  /pipeline/episodes/{id}/heartbeat:
+    post:
+      consumes:
+      - application/json
+      description: Pushes the lease out so work that takes longer than the lease —
+        an animation render, say — is not handed to a second worker while the first
+        is still on it.
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Worker holding the claim
+        in: body
+        name: worker
+        required: true
+        schema:
+          $ref: '#/definitions/main.WorkerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Episode'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Extend a claim on a long job
+      tags:
+      - pipeline
+  /pipeline/episodes/{id}/release:
+    post:
+      consumes:
+      - application/json
+      description: Called by a worker that cannot finish its job, so the episode returns
+        to the queue immediately instead of waiting out the lease.
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Worker releasing the claim
+        in: body
+        name: worker
+        required: true
+        schema:
+          $ref: '#/definitions/main.WorkerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Episode'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Give a claimed episode back
+      tags:
+      - pipeline
   /pipeline/episodes/{id}/transition:
     post:
       consumes:
@@ -911,8 +1011,9 @@ paths:
       - showbible
   /pipeline/queue:
     get:
-      description: How a production agent finds its next job. Returns every episode
-        currently waiting at the given stage, oldest first.
+      description: Read-only view of everything waiting at a stage, including which
+        worker holds each episode. To actually take work use POST /pipeline/queue/claim,
+        which hands one episode to one worker.
       parameters:
       - description: Pipeline stage to poll
         in: query
@@ -934,7 +1035,40 @@ paths:
             $ref: '#/definitions/main.ErrorResponse'
       security:
       - ApiKeyAuth: []
-      summary: Get the work queue for a stage
+      summary: Look at the work queue for a stage
+      tags:
+      - pipeline
+  /pipeline/queue/claim:
+    post:
+      consumes:
+      - application/json
+      description: How a worker picks up work. Hands the oldest available episode
+        at the stage to exactly one caller and holds it under an expiring lease, so
+        two workers polling the same stage never process the same episode. Returns
+        204 when the stage has nothing free.
+      parameters:
+      - description: Stage to take work from
+        in: body
+        name: claim
+        required: true
+        schema:
+          $ref: '#/definitions/main.ClaimRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Episode'
+        "204":
+          description: Nothing available at this stage
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Take the next job at a stage
       tags:
       - pipeline
   /pipeline/reviews/pending:

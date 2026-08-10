@@ -876,6 +876,122 @@ const docTemplate = `{
                 }
             }
         },
+        "/pipeline/episodes/{id}/heartbeat": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Pushes the lease out so work that takes longer than the lease — an animation render, say — is not handed to a second worker while the first is still on it.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline"
+                ],
+                "summary": "Extend a claim on a long job",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Worker holding the claim",
+                        "name": "worker",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.WorkerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Episode"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/episodes/{id}/release": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Called by a worker that cannot finish its job, so the episode returns to the queue immediately instead of waiting out the lease.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline"
+                ],
+                "summary": "Give a claimed episode back",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Worker releasing the claim",
+                        "name": "worker",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.WorkerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Episode"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/pipeline/episodes/{id}/transition": {
             "post": {
                 "security": [
@@ -1010,14 +1126,14 @@ const docTemplate = `{
                         "ApiKeyAuth": []
                     }
                 ],
-                "description": "How a production agent finds its next job. Returns every episode currently waiting at the given stage, oldest first.",
+                "description": "Read-only view of everything waiting at a stage, including which worker holds each episode. To actually take work use POST /pipeline/queue/claim, which hands one episode to one worker.",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "pipeline"
                 ],
-                "summary": "Get the work queue for a stage",
+                "summary": "Look at the work queue for a stage",
                 "parameters": [
                     {
                         "type": "string",
@@ -1036,6 +1152,54 @@ const docTemplate = `{
                                 "$ref": "#/definitions/main.Episode"
                             }
                         }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/queue/claim": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "How a worker picks up work. Hands the oldest available episode at the stage to exactly one caller and holds it under an expiring lease, so two workers polling the same stage never process the same episode. Returns 204 when the stage has nothing free.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline"
+                ],
+                "summary": "Take the next job at a stage",
+                "parameters": [
+                    {
+                        "description": "Stage to take work from",
+                        "name": "claim",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.ClaimRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Episode"
+                        }
+                    },
+                    "204": {
+                        "description": "Nothing available at this stage"
                     },
                     "400": {
                         "description": "Bad Request",
@@ -1275,6 +1439,17 @@ const docTemplate = `{
                 }
             }
         },
+        "main.ClaimRequest": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "$ref": "#/definitions/main.EpisodeStatus"
+                },
+                "worker_id": {
+                    "type": "string"
+                }
+            }
+        },
         "main.CurriculumTopic": {
             "type": "object",
             "properties": {
@@ -1312,6 +1487,13 @@ const docTemplate = `{
             "properties": {
                 "ai_disclosure": {
                     "type": "boolean"
+                },
+                "claimed_at": {
+                    "type": "string"
+                },
+                "claimed_by": {
+                    "description": "ClaimedBy is the worker currently holding this episode, and ClaimedAt\nis when it took it. The claim is a lease: it expires so a worker that\ndies mid-job does not strand the episode. Both are cleared whenever the\nepisode changes stage.",
+                    "type": "string"
                 },
                 "code": {
                     "type": "string"
@@ -1497,6 +1679,17 @@ const docTemplate = `{
                 },
                 "to_status": {
                     "$ref": "#/definitions/main.EpisodeStatus"
+                },
+                "worker_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.WorkerRequest": {
+            "type": "object",
+            "properties": {
+                "worker_id": {
+                    "type": "string"
                 }
             }
         }

@@ -208,6 +208,13 @@ func transitionEpisode(c *fiber.Ctx) error {
 		return badRequest(c, "to_status is required")
 	}
 
+	// A live claim means one worker owns this episode; nobody else may move
+	// it. Without this the claim would be advisory and a second worker could
+	// still finish the job it was not given.
+	if holder := claimHolder(&episode); holder != "" && holder != req.WorkerID {
+		return conflict(c, fmt.Sprintf("episode is claimed by %s until the lease expires", holder))
+	}
+
 	if err := validateTransition(episode.Status, req.ToStatus, false); err != nil {
 		return conflict(c, err.Error())
 	}
@@ -218,6 +225,9 @@ func transitionEpisode(c *fiber.Ctx) error {
 		now := time.Now()
 		episode.PublishedAt = &now
 	}
+	// The claim belonged to the stage just finished, so the next stage starts
+	// unclaimed and its own worker can take it.
+	clearClaim(&episode)
 
 	if err := db.Save(&episode).Error; err != nil {
 		return serverError(c, err.Error())
@@ -252,8 +262,8 @@ func getEpisodeEvents(c *fiber.Ctx) error {
 }
 
 // getPipelineQueue godoc
-// @Summary Get the work queue for a stage
-// @Description How a production agent finds its next job. Returns every episode currently waiting at the given stage, oldest first.
+// @Summary Look at the work queue for a stage
+// @Description Read-only view of everything waiting at a stage, including which worker holds each episode. To actually take work use POST /pipeline/queue/claim, which hands one episode to one worker.
 // @Tags pipeline
 // @Produce json
 // @Security ApiKeyAuth

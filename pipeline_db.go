@@ -35,6 +35,16 @@ func setupDB(path string) error {
 	}
 	db = conn
 
+	// SQLite takes one writer at a time. Capping the pool at a single
+	// connection makes concurrent workers queue instead of failing on a
+	// locked database, which matters as soon as more than one agent runs.
+	// Moving to Postgres is what lifts this limit.
+	sqlDB, err := conn.DB()
+	if err != nil {
+		return err
+	}
+	sqlDB.SetMaxOpenConns(1)
+
 	if err := db.AutoMigrate(
 		&Episode{},
 		&Character{},

@@ -20,10 +20,16 @@ const testSecret = "test-secret"
 // newTestApp builds the pipeline API over a fresh in-memory database, wired
 // with the same JWT middleware main.go uses.
 func newTestApp(t *testing.T) *fiber.App {
+	// A private cache keeps each test's database to itself.
+	return newTestAppAt(t, "file::memory:")
+}
+
+// newTestAppAt is newTestApp against a named database, for tests that need
+// several connections to see the same data.
+func newTestAppAt(t *testing.T, path string) *fiber.App {
 	t.Helper()
 
-	// A private cache keeps each test's database to itself.
-	if err := setupDB("file::memory:"); err != nil {
+	if err := setupDB(path); err != nil {
 		t.Fatalf("cannot set up test database: %v", err)
 	}
 

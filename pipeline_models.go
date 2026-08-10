@@ -78,8 +78,14 @@ type Episode struct {
 	PublishedAt    *time.Time `json:"published_at"`
 	YouTubeVideoID string     `json:"youtube_video_id" gorm:"size:64"`
 	TikTokVideoID  string     `json:"tiktok_video_id" gorm:"size:64"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	// ClaimedBy is the worker currently holding this episode, and ClaimedAt
+	// is when it took it. The claim is a lease: it expires so a worker that
+	// dies mid-job does not strand the episode. Both are cleared whenever the
+	// episode changes stage.
+	ClaimedBy string     `json:"claimed_by" gorm:"index;size:120"`
+	ClaimedAt *time.Time `json:"claimed_at"`
+	CreatedAt time.Time  `json:"created_at"`
+	UpdatedAt time.Time  `json:"updated_at"`
 }
 
 // Character is a member of the fixed cast. The reference sheet and voice
@@ -162,10 +168,23 @@ type EpisodeEvent struct {
 }
 
 // TransitionRequest is the body an agent posts to move an episode forward.
+// WorkerID must match the current claim when the episode is claimed.
 type TransitionRequest struct {
 	ToStatus EpisodeStatus `json:"to_status"`
 	Actor    string        `json:"actor"`
+	WorkerID string        `json:"worker_id"`
 	Note     string        `json:"note"`
+}
+
+// ClaimRequest is the body a worker posts to take the next job at a stage.
+type ClaimRequest struct {
+	Status   EpisodeStatus `json:"status"`
+	WorkerID string        `json:"worker_id"`
+}
+
+// WorkerRequest identifies the worker releasing or extending a claim.
+type WorkerRequest struct {
+	WorkerID string `json:"worker_id"`
 }
 
 // ApprovalRequest is the body a human reviewer posts at a gate. The reviewer

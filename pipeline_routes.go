@@ -7,9 +7,11 @@ import "github.com/gofiber/fiber/v2"
 func registerPipelineRoutes(app *fiber.App) {
 	pipeline := app.Group("/pipeline")
 
-	// Discovery and work queues, polled by the production agents.
+	// Discovery and work queues, polled by the production agents. The GET is
+	// a read-only view; claiming is what actually hands work to one worker.
 	pipeline.Get("/stages", getPipelineStages)
 	pipeline.Get("/queue", getPipelineQueue)
+	pipeline.Post("/queue/claim", claimWork)
 
 	// Episodes and their movement through the state machine.
 	pipeline.Get("/episodes", getEpisodes)
@@ -18,6 +20,8 @@ func registerPipelineRoutes(app *fiber.App) {
 	pipeline.Put("/episodes/:id", updateEpisode)
 	pipeline.Delete("/episodes/:id", deleteEpisode)
 	pipeline.Post("/episodes/:id/transition", transitionEpisode)
+	pipeline.Post("/episodes/:id/release", releaseClaim)
+	pipeline.Post("/episodes/:id/heartbeat", heartbeatClaim)
 	pipeline.Get("/episodes/:id/events", getEpisodeEvents)
 
 	// Human review gates. Recording a decision is restricted to the reviewer

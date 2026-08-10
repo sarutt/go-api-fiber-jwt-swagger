@@ -17,10 +17,11 @@ go run .
 The pipeline uses SQLite (pure Go, no cgo, no external service). The database
 file is created and seeded with the show bible on first run.
 
-| Variable     | Default             | Purpose                        |
-| ------------ | ------------------- | ------------------------------ |
-| `SECRET_KEY` | — (required, `.env`) | JWT signing key                |
-| `DB_PATH`    | `pompomhollow.db`   | Pipeline database file         |
+| Variable               | Default              | Purpose                       |
+| ---------------------- | -------------------- | ----------------------------- |
+| `SECRET_KEY`           | — (required, `.env`) | JWT signing key               |
+| `DB_PATH`              | `pompomhollow.db`    | Pipeline database file        |
+| `CLAIM_LEASE_MINUTES`  | `15`                 | How long a worker holds a job |
 
 Swagger UI: <http://localhost:8080/swagger/index.html>
 Regenerate docs after changing annotations: `swag init`
@@ -80,14 +81,54 @@ These rules are covered by tests in `pipeline_state_test.go` and
 `CANCELLED` is reachable from any active stage. `ANALYZED` and `CANCELLED` are
 terminal.
 
+## Work claiming
+
+`GET /pipeline/queue` only looks. To take work, a worker posts to
+`/pipeline/queue/claim` with its stage and a `worker_id`, and gets back exactly
+one episode — two workers polling the same stage never receive the same job.
+
+A claim is a lease, not a lock:
+
+- It expires after `CLAIM_LEASE_MINUTES`, so a worker that dies mid-job does
+  not strand the episode. Another worker picks it up once the lease lapses.
+- While a claim is live, only the holder may transition that episode. Everyone
+  else gets `409`.
+- Finishing a stage clears the claim, because the next stage belongs to a
+  different worker.
+- A worker that cannot finish should `POST .../release` rather than wait out
+  the lease.
+- Work that runs longer than the lease — an animation render — should
+  `POST .../heartbeat` to push it out. An expired claim cannot be extended;
+  the worker must claim the episode again.
+
+Episodes that are not claimed can still be transitioned by anyone, so a
+single-worker setup needs no claiming ceremony.
+
+```bash
+# Take the next voice-over job
+curl -X POST localhost:8080/pipeline/queue/claim -H "$AGENT" -H 'Content-Type: application/json' \
+  -d '{"status":"SCRIPT_APPROVED","worker_id":"voiceover-agent-7"}'
+
+# Hand it on when done, quoting the same worker_id
+curl -X POST localhost:8080/pipeline/episodes/1/transition -H "$AGENT" -H 'Content-Type: application/json' \
+  -d '{"to_status":"VO_GENERATED","worker_id":"voiceover-agent-7"}'
+```
+
+Note for scaling: SQLite takes one writer at a time, so the connection pool is
+capped at a single connection and concurrent workers queue behind each other.
+That is what serialises claims today. Moving to Postgres lifts the cap — the
+conditional update in `claimNextEpisode` is what keeps claiming correct once it
+does, and should not be simplified away.
+
 ## Endpoints
 
 **Pipeline**
 
-| Method | Path                 | Purpose                                        |
-| ------ | -------------------- | ---------------------------------------------- |
-| GET    | `/pipeline/stages`   | Describes every stage, its owner agent and gate |
-| GET    | `/pipeline/queue`    | `?status=` — an agent's work queue              |
+| Method | Path                     | Purpose                                        |
+| ------ | ------------------------ | ---------------------------------------------- |
+| GET    | `/pipeline/stages`       | Describes every stage, its owner agent and gate |
+| GET    | `/pipeline/queue`        | `?status=` — read-only view of a stage's queue  |
+| POST   | `/pipeline/queue/claim`  | Take the next job at a stage                    |
 
 **Episodes**
 
@@ -99,6 +140,8 @@ terminal.
 | PUT    | `/pipeline/episodes/{id}`                | Update content, not status   |
 | DELETE | `/pipeline/episodes/{id}`                | Delete                       |
 | POST   | `/pipeline/episodes/{id}/transition`     | Move to the next stage       |
+| POST   | `/pipeline/episodes/{id}/release`        | Give a claimed episode back  |
+| POST   | `/pipeline/episodes/{id}/heartbeat`      | Extend a claim on a long job |
 | GET    | `/pipeline/episodes/{id}/events`         | Stage history                |
 
 **Human review gates**
@@ -180,10 +223,9 @@ The scaffold is the orchestrator only. Still to come, per the roadmap:
 - YouTube Data API and TikTok Content Posting API integration in an upload worker
 - The reviewer dashboard UI (`/pipeline/reviews/pending` is the API behind it)
 - Analytics ingestion feeding back into curriculum planning
-- **Work claiming.** `GET /pipeline/queue` returns everything at a stage and
-  nothing marks work as taken, so two workers polling the same stage will both
-  pick up the same episode and generate it twice. Run one worker per stage until
-  this lands.
 - Real credential storage, and one identity per agent rather than a shared
   account (see Roles above)
 - Pagination on the list endpoints
+- A `FAILED` stage and retry accounting: a worker that gives up can only
+  release the episode back to the queue, so a job that always fails will be
+  retried forever
