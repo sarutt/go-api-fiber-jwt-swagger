@@ -1,5 +1,103 @@
 basePath: /
 definitions:
+  main.Alert:
+    properties:
+      acknowledged_at:
+        type: string
+      acknowledged_by:
+        type: string
+      created_at:
+        type: string
+      delivered_at:
+        type: string
+      episode_id:
+        type: integer
+      id:
+        type: integer
+      kind:
+        type: string
+      message:
+        type: string
+      resolved_at:
+        type: string
+      stage:
+        $ref: '#/definitions/main.EpisodeStatus'
+    type: object
+  main.ApprovalLog:
+    properties:
+      created_at:
+        type: string
+      decision:
+        type: string
+      episode_id:
+        type: integer
+      from_status:
+        $ref: '#/definitions/main.EpisodeStatus'
+      gate:
+        type: string
+      id:
+        type: integer
+      notes:
+        type: string
+      reviewer:
+        type: string
+      to_status:
+        $ref: '#/definitions/main.EpisodeStatus'
+    type: object
+  main.ApprovalRequest:
+    properties:
+      decision:
+        type: string
+      gate:
+        type: string
+      notes:
+        type: string
+    type: object
+  main.Asset:
+    properties:
+      content_type:
+        type: string
+      created_at:
+        type: string
+      duration_seconds:
+        type: integer
+      episode_id:
+        type: integer
+      generated_by:
+        type: string
+      id:
+        type: integer
+      kind:
+        $ref: '#/definitions/main.AssetKind'
+      platform:
+        type: string
+      size_bytes:
+        type: integer
+      storage_key:
+        type: string
+      uri:
+        type: string
+    type: object
+  main.AssetKind:
+    enum:
+    - SCRIPT
+    - VOICEOVER
+    - MUSIC
+    - ANIMATION
+    - MASTER_VIDEO
+    - SHORTS_CUT
+    - TIKTOK_CUT
+    - THUMBNAIL
+    type: string
+    x-enum-varnames:
+    - AssetScript
+    - AssetVoiceOver
+    - AssetMusic
+    - AssetAnimation
+    - AssetMasterVideo
+    - AssetShortsCut
+    - AssetTikTokCut
+    - AssetThumbnail
   main.Book:
     properties:
       author:
@@ -9,11 +107,304 @@ definitions:
       title:
         type: string
     type: object
+  main.Character:
+    properties:
+      active:
+        type: boolean
+      color_hex:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      reference_sheet_url:
+        type: string
+      role:
+        type: string
+      signature_item:
+        type: string
+      species:
+        type: string
+      teaches:
+        type: string
+      updated_at:
+        type: string
+      voice_profile_id:
+        type: string
+    type: object
+  main.ClaimRequest:
+    properties:
+      status:
+        $ref: '#/definitions/main.EpisodeStatus'
+      worker_id:
+        type: string
+    type: object
+  main.CurriculumTopic:
+    properties:
+      created_at:
+        type: string
+      difficulty_level:
+        type: integer
+      id:
+        type: integer
+      learning_goal:
+        type: string
+      theme:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      used:
+        type: boolean
+      week_in_cycle:
+        type: integer
+    type: object
+  main.Episode:
+    properties:
+      ai_disclosure:
+        type: boolean
+      attempts:
+        description: |-
+          Attempts counts how many times the current stage has been tried. It
+          resets whenever the episode moves on, so it measures this stage rather
+          than the episode's whole history.
+        type: integer
+      claimed_at:
+        type: string
+      claimed_by:
+        description: |-
+          ClaimedBy is the worker currently holding this episode, and ClaimedAt
+          is when it took it. The claim is a lease: it expires so a worker that
+          dies mid-job does not strand the episode. Both are cleared whenever the
+          episode changes stage.
+        type: string
+      code:
+        type: string
+      created_at:
+        type: string
+      curriculum_topic_id:
+        type: integer
+      duration_seconds:
+        type: integer
+      failed_from:
+        $ref: '#/definitions/main.EpisodeStatus'
+      id:
+        type: integer
+      last_error:
+        type: string
+      made_for_kids:
+        description: |-
+          MadeForKids drives the YouTube selfDeclaredMadeForKids flag. It defaults
+          to true because every episode of this show is children's content, and
+          getting this wrong is a COPPA problem rather than a cosmetic one.
+        type: boolean
+      published_at:
+        type: string
+      scheduled_at:
+        type: string
+      script_text:
+        type: string
+      song_lyrics:
+        type: string
+      song_title:
+        type: string
+      status:
+        $ref: '#/definitions/main.EpisodeStatus'
+      synopsis:
+        type: string
+      tiktok_video_id:
+        type: string
+      title:
+        type: string
+      updated_at:
+        type: string
+      youtube_video_id:
+        type: string
+    type: object
+  main.EpisodeEvent:
+    properties:
+      actor:
+        type: string
+      created_at:
+        type: string
+      episode_id:
+        type: integer
+      from_status:
+        $ref: '#/definitions/main.EpisodeStatus'
+      id:
+        type: integer
+      note:
+        type: string
+      to_status:
+        $ref: '#/definitions/main.EpisodeStatus'
+    type: object
+  main.EpisodeStatus:
+    enum:
+    - IDEA_BACKLOG
+    - SCRIPT_DRAFT
+    - SCRIPT_APPROVED
+    - VO_GENERATED
+    - MUSIC_GENERATED
+    - ANIMATION_RENDERED
+    - ASSEMBLED
+    - QA_REVIEW
+    - PLATFORM_ADAPTED
+    - SCHEDULED
+    - PUBLISHED
+    - ANALYZED
+    - CANCELLED
+    - FAILED
+    type: string
+    x-enum-varnames:
+    - StatusIdeaBacklog
+    - StatusScriptDraft
+    - StatusScriptApproved
+    - StatusVOGenerated
+    - StatusMusicGenerated
+    - StatusAnimationRendered
+    - StatusAssembled
+    - StatusQAReview
+    - StatusPlatformAdapted
+    - StatusScheduled
+    - StatusPublished
+    - StatusAnalyzed
+    - StatusCancelled
+    - StatusFailed
+  main.ErrorResponse:
+    properties:
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  main.FailRequest:
+    properties:
+      error:
+        type: string
+      worker_id:
+        type: string
+    type: object
+  main.Location:
+    properties:
+      background_asset_url:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      updated_at:
+        type: string
+      used_for:
+        type: string
+    type: object
+  main.PauseRequest:
+    properties:
+      reason:
+        type: string
+      scope:
+        type: string
+    type: object
+  main.PipelineControl:
+    properties:
+      id:
+        type: integer
+      paused:
+        type: boolean
+      paused_at:
+        type: string
+      paused_by:
+        type: string
+      reason:
+        type: string
+      scope:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  main.PipelineOverview:
+    properties:
+      awaiting_review:
+        type: integer
+      claimed_now:
+        type: integer
+      failed:
+        type: integer
+      in_flight:
+        type: integer
+      open_alerts:
+        type: integer
+      pause_reason:
+        type: string
+      paused:
+        type: boolean
+      paused_stages:
+        items:
+          type: string
+        type: array
+      published_total:
+        type: integer
+      stages:
+        items:
+          $ref: '#/definitions/main.StageCount'
+        type: array
+      stuck:
+        items:
+          $ref: '#/definitions/main.Episode'
+        type: array
+    type: object
+  main.StageCount:
+    properties:
+      count:
+        type: integer
+      paused:
+        type: boolean
+      status:
+        $ref: '#/definitions/main.EpisodeStatus'
+    type: object
+  main.StageInfo:
+    properties:
+      layer:
+        type: string
+      next_statuses:
+        items:
+          $ref: '#/definitions/main.EpisodeStatus'
+        type: array
+      owner_agent:
+        type: string
+      requires_gate:
+        type: string
+      status:
+        $ref: '#/definitions/main.EpisodeStatus'
+    type: object
+  main.TransitionRequest:
+    properties:
+      actor:
+        type: string
+      note:
+        type: string
+      to_status:
+        $ref: '#/definitions/main.EpisodeStatus'
+      worker_id:
+        type: string
+    type: object
+  main.WorkerRequest:
+    properties:
+      worker_id:
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact: {}
-  description: This is a sample server for a book API.
-  title: Book API
+  description: Orchestration backend for the automated short-form video pipeline,
+    plus the original book sample endpoints.
+  title: Pom Pom Hollow Production API
   version: "1.0"
 paths:
   /books:
@@ -35,6 +426,1142 @@ paths:
       summary: Get all books
       tags:
       - books
+  /pipeline/alerts:
+    get:
+      description: What the pipeline has flagged for a person. Defaults to open alerts;
+        pass ?all=true for the history.
+      parameters:
+      - description: Include resolved and acknowledged alerts
+        in: query
+        name: all
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.Alert'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List alerts
+      tags:
+      - pipeline-control
+  /pipeline/alerts/{id}/ack:
+    post:
+      description: Marks an alert as seen. Distinct from resolved, which the pipeline
+        sets by itself once the condition passes — acknowledging says a person looked,
+        not that the problem went away.
+      parameters:
+      - description: Alert ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Alert'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Acknowledge an alert
+      tags:
+      - pipeline-control
+  /pipeline/assets/{id}:
+    delete:
+      description: Removes the record and, when the pipeline stored the file, the
+        file itself.
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete an asset
+      tags:
+      - pipeline-assets
+  /pipeline/assets/{id}/content:
+    get:
+      description: Serves a file the pipeline stores. Assets registered as a URI the
+        agent hosts elsewhere have nothing to serve and return 404.
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Download an asset
+      tags:
+      - pipeline-assets
+  /pipeline/characters:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.Character'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List the cast
+      tags:
+      - showbible
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Character
+        in: body
+        name: character
+        required: true
+        schema:
+          $ref: '#/definitions/main.Character'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/main.Character'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Add a character to the cast
+      tags:
+      - showbible
+  /pipeline/characters/{id}:
+    get:
+      parameters:
+      - description: Character ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Character'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get one character
+      tags:
+      - showbible
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Character ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Character fields to update
+        in: body
+        name: character
+        required: true
+        schema:
+          $ref: '#/definitions/main.Character'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Character'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Update a character
+      tags:
+      - showbible
+  /pipeline/control:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.PipelineControl'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: Show what is paused
+      tags:
+      - pipeline-control
+  /pipeline/control/pause:
+    post:
+      consumes:
+      - application/json
+      description: 'The operator''s stop switch. Workers can no longer take work,
+        so the pipeline drains rather than halting mid-job: whatever is already claimed
+        finishes, nothing new starts. Pass a stage as the scope to pause one step
+        — pausing SCHEDULED holds uploads while the rest keeps producing.'
+      parameters:
+      - description: What to pause and why
+        in: body
+        name: pause
+        required: true
+        schema:
+          $ref: '#/definitions/main.PauseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.PipelineControl'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Stop production
+      tags:
+      - pipeline-control
+  /pipeline/control/resume:
+    post:
+      consumes:
+      - application/json
+      description: Lifts a pause. Workers begin taking work at their next poll; nothing
+        needs restarting.
+      parameters:
+      - description: What to resume
+        in: body
+        name: pause
+        required: true
+        schema:
+          $ref: '#/definitions/main.PauseRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.PipelineControl'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Start production again
+      tags:
+      - pipeline-control
+  /pipeline/curriculum-topics:
+    get:
+      parameters:
+      - description: Filter by theme
+        enum:
+        - COUNTING
+        - LETTERS
+        - EMOTIONS
+        - KINDNESS
+        in: query
+        name: theme
+        type: string
+      - description: Filter by whether a topic has been used
+        in: query
+        name: used
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.CurriculumTopic'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List curriculum topics
+      tags:
+      - showbible
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Curriculum topic
+        in: body
+        name: topic
+        required: true
+        schema:
+          $ref: '#/definitions/main.CurriculumTopic'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/main.CurriculumTopic'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Add a curriculum topic to the backlog
+      tags:
+      - showbible
+  /pipeline/curriculum-topics/{id}/used:
+    post:
+      description: Called once an episode has been created from the topic, so the
+        rotation moves on.
+      parameters:
+      - description: Curriculum topic ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.CurriculumTopic'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Mark a curriculum topic as used
+      tags:
+      - showbible
+  /pipeline/curriculum-topics/next:
+    get:
+      description: What the content idea agent calls to find the next teaching subject
+        due in the rotation. Returns the lowest difficulty unused topic, following
+        the four week cycle order.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.CurriculumTopic'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get the next unused curriculum topic
+      tags:
+      - showbible
+  /pipeline/episodes:
+    get:
+      consumes:
+      - application/json
+      description: List every episode, newest first. Filter by pipeline stage with
+        ?status=
+      parameters:
+      - description: Filter by pipeline status
+        enum:
+        - IDEA_BACKLOG
+        - SCRIPT_DRAFT
+        - SCRIPT_APPROVED
+        - VO_GENERATED
+        - MUSIC_GENERATED
+        - ANIMATION_RENDERED
+        - ASSEMBLED
+        - QA_REVIEW
+        - PLATFORM_ADAPTED
+        - SCHEDULED
+        - PUBLISHED
+        - ANALYZED
+        - CANCELLED
+        in: query
+        name: status
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.Episode'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List episodes
+      tags:
+      - pipeline-episodes
+    post:
+      consumes:
+      - application/json
+      description: Creates an episode in IDEA_BACKLOG. Status from the request body
+        is ignored — every episode enters the pipeline at the first stage.
+      parameters:
+      - description: Episode
+        in: body
+        name: episode
+        required: true
+        schema:
+          $ref: '#/definitions/main.Episode'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/main.Episode'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Create an episode
+      tags:
+      - pipeline-episodes
+  /pipeline/episodes/{id}:
+    delete:
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Delete an episode
+      tags:
+      - pipeline-episodes
+    get:
+      consumes:
+      - application/json
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Episode'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get one episode
+      tags:
+      - pipeline-episodes
+    put:
+      consumes:
+      - application/json
+      description: Updates the editorial fields of an episode. Status is not editable
+        here — use the transition endpoint.
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Episode fields to update
+        in: body
+        name: episode
+        required: true
+        schema:
+          $ref: '#/definitions/main.Episode'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Episode'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Update episode content
+      tags:
+      - pipeline-episodes
+  /pipeline/episodes/{id}/approvals:
+    get:
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.ApprovalLog'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List the gate decisions for an episode
+      tags:
+      - pipeline-approvals
+    post:
+      consumes:
+      - application/json
+      description: The only way past the two mandatory review gates, and restricted
+        to the reviewer role so an agent cannot approve its own work. GATE_1_SCRIPT
+        releases an approved script into production; GATE_2_RELEASE clears an assembled
+        episode for publishing. The decision is attributed to the authenticated caller,
+        and a rejection sends the episode back for rework.
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Gate decision
+        in: body
+        name: approval
+        required: true
+        schema:
+          $ref: '#/definitions/main.ApprovalRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/main.ApprovalLog'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Record a human decision at a gate
+      tags:
+      - pipeline-approvals
+  /pipeline/episodes/{id}/assets:
+    get:
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Filter by asset kind
+        enum:
+        - SCRIPT
+        - VOICEOVER
+        - MUSIC
+        - ANIMATION
+        - MASTER_VIDEO
+        - SHORTS_CUT
+        - TIKTOK_CUT
+        - THUMBNAIL
+        in: query
+        name: kind
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.Asset'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List the files produced for an episode
+      tags:
+      - pipeline-assets
+    post:
+      consumes:
+      - application/json
+      description: How a generation agent reports its output. The episode ID comes
+        from the path, so an agent cannot file an asset against a different episode.
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Asset
+        in: body
+        name: asset
+        required: true
+        schema:
+          $ref: '#/definitions/main.Asset'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/main.Asset'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Register a produced file against an episode
+      tags:
+      - pipeline-assets
+  /pipeline/episodes/{id}/assets/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: How a generation agent hands over bytes rather than a URI it hosts
+        itself. Creates the asset record and stores the file in one call. The storage
+        path is derived from the episode and asset, never from the uploaded filename.
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Asset kind
+        enum:
+        - SCRIPT
+        - VOICEOVER
+        - MUSIC
+        - ANIMATION
+        - MASTER_VIDEO
+        - SHORTS_CUT
+        - TIKTOK_CUT
+        - THUMBNAIL
+        in: formData
+        name: kind
+        required: true
+        type: string
+      - description: Platform this cut targets
+        in: formData
+        name: platform
+        type: string
+      - description: Worker that produced it
+        in: formData
+        name: generated_by
+        type: string
+      - description: Duration, for audio and video
+        in: formData
+        name: duration_seconds
+        type: integer
+      - description: The file
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/main.Asset'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "413":
+          description: Request Entity Too Large
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "415":
+          description: Unsupported Media Type
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Upload a produced file
+      tags:
+      - pipeline-assets
+  /pipeline/episodes/{id}/events:
+    get:
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.EpisodeEvent'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: Get the stage history of an episode
+      tags:
+      - pipeline-episodes
+  /pipeline/episodes/{id}/fail:
+    post:
+      consumes:
+      - application/json
+      description: Called by a worker that has given up. The stage is retried until
+        the attempt limit, after which the episode is parked in FAILED for a person
+        to look at rather than being retried forever.
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: What went wrong
+        in: body
+        name: failure
+        required: true
+        schema:
+          $ref: '#/definitions/main.FailRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Episode'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Report that a job could not be finished
+      tags:
+      - pipeline-episodes
+  /pipeline/episodes/{id}/heartbeat:
+    post:
+      consumes:
+      - application/json
+      description: Pushes the lease out so work that takes longer than the lease —
+        an animation render, say — is not handed to a second worker while the first
+        is still on it.
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Worker holding the claim
+        in: body
+        name: worker
+        required: true
+        schema:
+          $ref: '#/definitions/main.WorkerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Episode'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Extend a claim on a long job
+      tags:
+      - pipeline
+  /pipeline/episodes/{id}/release:
+    post:
+      consumes:
+      - application/json
+      description: Called by a worker that cannot finish its job, so the episode returns
+        to the queue immediately instead of waiting out the lease.
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Worker releasing the claim
+        in: body
+        name: worker
+        required: true
+        schema:
+          $ref: '#/definitions/main.WorkerRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Episode'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Give a claimed episode back
+      tags:
+      - pipeline
+  /pipeline/episodes/{id}/retry:
+    post:
+      description: The one sanctioned way out of FAILED. Restores the stage the episode
+        failed at and clears the attempt count, so a fix to the underlying problem
+        can be tried without recreating the episode.
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Episode'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Put a failed episode back to work
+      tags:
+      - pipeline-control
+  /pipeline/episodes/{id}/transition:
+    post:
+      consumes:
+      - application/json
+      description: Used by production agents. Refuses any move the state machine does
+        not allow, and refuses the two gate transitions, which require a human approval
+        instead.
+      parameters:
+      - description: Episode ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Target stage
+        in: body
+        name: transition
+        required: true
+        schema:
+          $ref: '#/definitions/main.TransitionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Episode'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Move an episode to the next stage
+      tags:
+      - pipeline-episodes
+  /pipeline/locations:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.Location'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: List the recurring sets
+      tags:
+      - showbible
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Location
+        in: body
+        name: location
+        required: true
+        schema:
+          $ref: '#/definitions/main.Location'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/main.Location'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Add a set
+      tags:
+      - showbible
+  /pipeline/overview:
+    get:
+      description: 'Everything one operator needs to see at a glance: whether production
+        is running, how much sits at each stage, what is waiting on a human, what
+        has failed, and what has gone quiet.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.PipelineOverview'
+      security:
+      - ApiKeyAuth: []
+      summary: The whole operation on one screen
+      tags:
+      - pipeline-control
+  /pipeline/queue:
+    get:
+      description: Read-only view of everything waiting at a stage, including which
+        worker holds each episode. To actually take work use POST /pipeline/queue/claim,
+        which hands one episode to one worker.
+      parameters:
+      - description: Pipeline stage to poll
+        in: query
+        name: status
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.Episode'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Look at the work queue for a stage
+      tags:
+      - pipeline
+  /pipeline/queue/claim:
+    post:
+      consumes:
+      - application/json
+      description: How a worker picks up work. Hands the oldest available episode
+        at the stage to exactly one caller and holds it under an expiring lease, so
+        two workers polling the same stage never process the same episode. Returns
+        204 when the stage has nothing free, and 423 when the operator has paused
+        production.
+      parameters:
+      - description: Stage to take work from
+        in: body
+        name: claim
+        required: true
+        schema:
+          $ref: '#/definitions/main.ClaimRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.Episode'
+        "204":
+          description: Nothing available at this stage
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+        "423":
+          description: Locked
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Take the next job at a stage
+      tags:
+      - pipeline
+  /pipeline/reviews/pending:
+    get:
+      description: 'Powers the reviewer dashboard: every episode currently parked
+        at a gate. Filter to one gate with ?gate=GATE_1_SCRIPT'
+      parameters:
+      - description: Limit to one gate
+        enum:
+        - GATE_1_SCRIPT
+        - GATE_2_RELEASE
+        in: query
+        name: gate
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.Episode'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/main.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: List everything waiting on a human
+      tags:
+      - pipeline-approvals
+  /pipeline/stages:
+    get:
+      description: Returns every stage with its owning agent, allowed next stages
+        and any human gate. Lets an agent discover where it fits without hardcoding
+        the flow.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/main.StageInfo'
+            type: array
+      security:
+      - ApiKeyAuth: []
+      summary: Describe the pipeline
+      tags:
+      - pipeline
 schemes:
 - http
 securityDefinitions:

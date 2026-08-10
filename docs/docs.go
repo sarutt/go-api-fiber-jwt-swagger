@@ -45,9 +45,1879 @@ const docTemplate = `{
                     }
                 }
             }
+        },
+        "/pipeline/alerts": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "What the pipeline has flagged for a person. Defaults to open alerts; pass ?all=true for the history.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-control"
+                ],
+                "summary": "List alerts",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "Include resolved and acknowledged alerts",
+                        "name": "all",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Alert"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/alerts/{id}/ack": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Marks an alert as seen. Distinct from resolved, which the pipeline sets by itself once the condition passes — acknowledging says a person looked, not that the problem went away.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-control"
+                ],
+                "summary": "Acknowledge an alert",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Alert ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Alert"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/assets/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Removes the record and, when the pipeline stored the file, the file itself.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-assets"
+                ],
+                "summary": "Delete an asset",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Asset ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Deleted"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/assets/{id}/content": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Serves a file the pipeline stores. Assets registered as a URI the agent hosts elsewhere have nothing to serve and return 404.",
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "pipeline-assets"
+                ],
+                "summary": "Download an asset",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Asset ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/characters": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "showbible"
+                ],
+                "summary": "List the cast",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Character"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "showbible"
+                ],
+                "summary": "Add a character to the cast",
+                "parameters": [
+                    {
+                        "description": "Character",
+                        "name": "character",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.Character"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/main.Character"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/characters/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "showbible"
+                ],
+                "summary": "Get one character",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Character ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Character"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "showbible"
+                ],
+                "summary": "Update a character",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Character ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Character fields to update",
+                        "name": "character",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.Character"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Character"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/control": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-control"
+                ],
+                "summary": "Show what is paused",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.PipelineControl"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/control/pause": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "The operator's stop switch. Workers can no longer take work, so the pipeline drains rather than halting mid-job: whatever is already claimed finishes, nothing new starts. Pass a stage as the scope to pause one step — pausing SCHEDULED holds uploads while the rest keeps producing.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-control"
+                ],
+                "summary": "Stop production",
+                "parameters": [
+                    {
+                        "description": "What to pause and why",
+                        "name": "pause",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.PauseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.PipelineControl"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/control/resume": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Lifts a pause. Workers begin taking work at their next poll; nothing needs restarting.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-control"
+                ],
+                "summary": "Start production again",
+                "parameters": [
+                    {
+                        "description": "What to resume",
+                        "name": "pause",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.PauseRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.PipelineControl"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/curriculum-topics": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "showbible"
+                ],
+                "summary": "List curriculum topics",
+                "parameters": [
+                    {
+                        "enum": [
+                            "COUNTING",
+                            "LETTERS",
+                            "EMOTIONS",
+                            "KINDNESS"
+                        ],
+                        "type": "string",
+                        "description": "Filter by theme",
+                        "name": "theme",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "Filter by whether a topic has been used",
+                        "name": "used",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.CurriculumTopic"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "showbible"
+                ],
+                "summary": "Add a curriculum topic to the backlog",
+                "parameters": [
+                    {
+                        "description": "Curriculum topic",
+                        "name": "topic",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.CurriculumTopic"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/main.CurriculumTopic"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/curriculum-topics/next": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "What the content idea agent calls to find the next teaching subject due in the rotation. Returns the lowest difficulty unused topic, following the four week cycle order.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "showbible"
+                ],
+                "summary": "Get the next unused curriculum topic",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.CurriculumTopic"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/curriculum-topics/{id}/used": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Called once an episode has been created from the topic, so the rotation moves on.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "showbible"
+                ],
+                "summary": "Mark a curriculum topic as used",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Curriculum topic ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.CurriculumTopic"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/episodes": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "List every episode, newest first. Filter by pipeline stage with ?status=",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-episodes"
+                ],
+                "summary": "List episodes",
+                "parameters": [
+                    {
+                        "enum": [
+                            "IDEA_BACKLOG",
+                            "SCRIPT_DRAFT",
+                            "SCRIPT_APPROVED",
+                            "VO_GENERATED",
+                            "MUSIC_GENERATED",
+                            "ANIMATION_RENDERED",
+                            "ASSEMBLED",
+                            "QA_REVIEW",
+                            "PLATFORM_ADAPTED",
+                            "SCHEDULED",
+                            "PUBLISHED",
+                            "ANALYZED",
+                            "CANCELLED"
+                        ],
+                        "type": "string",
+                        "description": "Filter by pipeline status",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Episode"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Creates an episode in IDEA_BACKLOG. Status from the request body is ignored — every episode enters the pipeline at the first stage.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-episodes"
+                ],
+                "summary": "Create an episode",
+                "parameters": [
+                    {
+                        "description": "Episode",
+                        "name": "episode",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.Episode"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/main.Episode"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/episodes/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-episodes"
+                ],
+                "summary": "Get one episode",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Episode"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "put": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Updates the editorial fields of an episode. Status is not editable here — use the transition endpoint.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-episodes"
+                ],
+                "summary": "Update episode content",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Episode fields to update",
+                        "name": "episode",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.Episode"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Episode"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-episodes"
+                ],
+                "summary": "Delete an episode",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "Deleted"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/episodes/{id}/approvals": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-approvals"
+                ],
+                "summary": "List the gate decisions for an episode",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.ApprovalLog"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "The only way past the two mandatory review gates, and restricted to the reviewer role so an agent cannot approve its own work. GATE_1_SCRIPT releases an approved script into production; GATE_2_RELEASE clears an assembled episode for publishing. The decision is attributed to the authenticated caller, and a rejection sends the episode back for rework.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-approvals"
+                ],
+                "summary": "Record a human decision at a gate",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Gate decision",
+                        "name": "approval",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.ApprovalRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/main.ApprovalLog"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/episodes/{id}/assets": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-assets"
+                ],
+                "summary": "List the files produced for an episode",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "SCRIPT",
+                            "VOICEOVER",
+                            "MUSIC",
+                            "ANIMATION",
+                            "MASTER_VIDEO",
+                            "SHORTS_CUT",
+                            "TIKTOK_CUT",
+                            "THUMBNAIL"
+                        ],
+                        "type": "string",
+                        "description": "Filter by asset kind",
+                        "name": "kind",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Asset"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "How a generation agent reports its output. The episode ID comes from the path, so an agent cannot file an asset against a different episode.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-assets"
+                ],
+                "summary": "Register a produced file against an episode",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Asset",
+                        "name": "asset",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.Asset"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/main.Asset"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/episodes/{id}/assets/upload": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "How a generation agent hands over bytes rather than a URI it hosts itself. Creates the asset record and stores the file in one call. The storage path is derived from the episode and asset, never from the uploaded filename.",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-assets"
+                ],
+                "summary": "Upload a produced file",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "enum": [
+                            "SCRIPT",
+                            "VOICEOVER",
+                            "MUSIC",
+                            "ANIMATION",
+                            "MASTER_VIDEO",
+                            "SHORTS_CUT",
+                            "TIKTOK_CUT",
+                            "THUMBNAIL"
+                        ],
+                        "type": "string",
+                        "description": "Asset kind",
+                        "name": "kind",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Platform this cut targets",
+                        "name": "platform",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Worker that produced it",
+                        "name": "generated_by",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Duration, for audio and video",
+                        "name": "duration_seconds",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "The file",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/main.Asset"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "413": {
+                        "description": "Request Entity Too Large",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "415": {
+                        "description": "Unsupported Media Type",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/episodes/{id}/events": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-episodes"
+                ],
+                "summary": "Get the stage history of an episode",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.EpisodeEvent"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/episodes/{id}/fail": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Called by a worker that has given up. The stage is retried until the attempt limit, after which the episode is parked in FAILED for a person to look at rather than being retried forever.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-episodes"
+                ],
+                "summary": "Report that a job could not be finished",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "What went wrong",
+                        "name": "failure",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.FailRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Episode"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/episodes/{id}/heartbeat": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Pushes the lease out so work that takes longer than the lease — an animation render, say — is not handed to a second worker while the first is still on it.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline"
+                ],
+                "summary": "Extend a claim on a long job",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Worker holding the claim",
+                        "name": "worker",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.WorkerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Episode"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/episodes/{id}/release": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Called by a worker that cannot finish its job, so the episode returns to the queue immediately instead of waiting out the lease.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline"
+                ],
+                "summary": "Give a claimed episode back",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Worker releasing the claim",
+                        "name": "worker",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.WorkerRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Episode"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/episodes/{id}/retry": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "The one sanctioned way out of FAILED. Restores the stage the episode failed at and clears the attempt count, so a fix to the underlying problem can be tried without recreating the episode.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-control"
+                ],
+                "summary": "Put a failed episode back to work",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Episode"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/episodes/{id}/transition": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Used by production agents. Refuses any move the state machine does not allow, and refuses the two gate transitions, which require a human approval instead.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-episodes"
+                ],
+                "summary": "Move an episode to the next stage",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Episode ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Target stage",
+                        "name": "transition",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.TransitionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Episode"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/locations": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "showbible"
+                ],
+                "summary": "List the recurring sets",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Location"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "showbible"
+                ],
+                "summary": "Add a set",
+                "parameters": [
+                    {
+                        "description": "Location",
+                        "name": "location",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.Location"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/main.Location"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/overview": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Everything one operator needs to see at a glance: whether production is running, how much sits at each stage, what is waiting on a human, what has failed, and what has gone quiet.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-control"
+                ],
+                "summary": "The whole operation on one screen",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.PipelineOverview"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/queue": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Read-only view of everything waiting at a stage, including which worker holds each episode. To actually take work use POST /pipeline/queue/claim, which hands one episode to one worker.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline"
+                ],
+                "summary": "Look at the work queue for a stage",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pipeline stage to poll",
+                        "name": "status",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Episode"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/queue/claim": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "How a worker picks up work. Hands the oldest available episode at the stage to exactly one caller and holds it under an expiring lease, so two workers polling the same stage never process the same episode. Returns 204 when the stage has nothing free, and 423 when the operator has paused production.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline"
+                ],
+                "summary": "Take the next job at a stage",
+                "parameters": [
+                    {
+                        "description": "Stage to take work from",
+                        "name": "claim",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/main.ClaimRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.Episode"
+                        }
+                    },
+                    "204": {
+                        "description": "Nothing available at this stage"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    },
+                    "423": {
+                        "description": "Locked",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/reviews/pending": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Powers the reviewer dashboard: every episode currently parked at a gate. Filter to one gate with ?gate=GATE_1_SCRIPT",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline-approvals"
+                ],
+                "summary": "List everything waiting on a human",
+                "parameters": [
+                    {
+                        "enum": [
+                            "GATE_1_SCRIPT",
+                            "GATE_2_RELEASE"
+                        ],
+                        "type": "string",
+                        "description": "Limit to one gate",
+                        "name": "gate",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.Episode"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/main.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/pipeline/stages": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns every stage with its owning agent, allowed next stages and any human gate. Lets an agent discover where it fits without hardcoding the flow.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "pipeline"
+                ],
+                "summary": "Describe the pipeline",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/main.StageInfo"
+                            }
+                        }
+                    }
+                }
+            }
         }
     },
     "definitions": {
+        "main.Alert": {
+            "type": "object",
+            "properties": {
+                "acknowledged_at": {
+                    "type": "string"
+                },
+                "acknowledged_by": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "delivered_at": {
+                    "type": "string"
+                },
+                "episode_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "resolved_at": {
+                    "type": "string"
+                },
+                "stage": {
+                    "$ref": "#/definitions/main.EpisodeStatus"
+                }
+            }
+        },
+        "main.ApprovalLog": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "decision": {
+                    "type": "string"
+                },
+                "episode_id": {
+                    "type": "integer"
+                },
+                "from_status": {
+                    "$ref": "#/definitions/main.EpisodeStatus"
+                },
+                "gate": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "notes": {
+                    "type": "string"
+                },
+                "reviewer": {
+                    "type": "string"
+                },
+                "to_status": {
+                    "$ref": "#/definitions/main.EpisodeStatus"
+                }
+            }
+        },
+        "main.ApprovalRequest": {
+            "type": "object",
+            "properties": {
+                "decision": {
+                    "type": "string"
+                },
+                "gate": {
+                    "type": "string"
+                },
+                "notes": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.Asset": {
+            "type": "object",
+            "properties": {
+                "content_type": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "duration_seconds": {
+                    "type": "integer"
+                },
+                "episode_id": {
+                    "type": "integer"
+                },
+                "generated_by": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "kind": {
+                    "$ref": "#/definitions/main.AssetKind"
+                },
+                "platform": {
+                    "type": "string"
+                },
+                "size_bytes": {
+                    "type": "integer"
+                },
+                "storage_key": {
+                    "type": "string"
+                },
+                "uri": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.AssetKind": {
+            "type": "string",
+            "enum": [
+                "SCRIPT",
+                "VOICEOVER",
+                "MUSIC",
+                "ANIMATION",
+                "MASTER_VIDEO",
+                "SHORTS_CUT",
+                "TIKTOK_CUT",
+                "THUMBNAIL"
+            ],
+            "x-enum-varnames": [
+                "AssetScript",
+                "AssetVoiceOver",
+                "AssetMusic",
+                "AssetAnimation",
+                "AssetMasterVideo",
+                "AssetShortsCut",
+                "AssetTikTokCut",
+                "AssetThumbnail"
+            ]
+        },
         "main.Book": {
             "type": "object",
             "properties": {
@@ -58,6 +1928,422 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.Character": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                },
+                "color_hex": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "reference_sheet_url": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "signature_item": {
+                    "type": "string"
+                },
+                "species": {
+                    "type": "string"
+                },
+                "teaches": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "voice_profile_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.ClaimRequest": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "$ref": "#/definitions/main.EpisodeStatus"
+                },
+                "worker_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.CurriculumTopic": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "difficulty_level": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "learning_goal": {
+                    "type": "string"
+                },
+                "theme": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "used": {
+                    "type": "boolean"
+                },
+                "week_in_cycle": {
+                    "type": "integer"
+                }
+            }
+        },
+        "main.Episode": {
+            "type": "object",
+            "properties": {
+                "ai_disclosure": {
+                    "type": "boolean"
+                },
+                "attempts": {
+                    "description": "Attempts counts how many times the current stage has been tried. It\nresets whenever the episode moves on, so it measures this stage rather\nthan the episode's whole history.",
+                    "type": "integer"
+                },
+                "claimed_at": {
+                    "type": "string"
+                },
+                "claimed_by": {
+                    "description": "ClaimedBy is the worker currently holding this episode, and ClaimedAt\nis when it took it. The claim is a lease: it expires so a worker that\ndies mid-job does not strand the episode. Both are cleared whenever the\nepisode changes stage.",
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "curriculum_topic_id": {
+                    "type": "integer"
+                },
+                "duration_seconds": {
+                    "type": "integer"
+                },
+                "failed_from": {
+                    "$ref": "#/definitions/main.EpisodeStatus"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "last_error": {
+                    "type": "string"
+                },
+                "made_for_kids": {
+                    "description": "MadeForKids drives the YouTube selfDeclaredMadeForKids flag. It defaults\nto true because every episode of this show is children's content, and\ngetting this wrong is a COPPA problem rather than a cosmetic one.",
+                    "type": "boolean"
+                },
+                "published_at": {
+                    "type": "string"
+                },
+                "scheduled_at": {
+                    "type": "string"
+                },
+                "script_text": {
+                    "type": "string"
+                },
+                "song_lyrics": {
+                    "type": "string"
+                },
+                "song_title": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/main.EpisodeStatus"
+                },
+                "synopsis": {
+                    "type": "string"
+                },
+                "tiktok_video_id": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "youtube_video_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.EpisodeEvent": {
+            "type": "object",
+            "properties": {
+                "actor": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "episode_id": {
+                    "type": "integer"
+                },
+                "from_status": {
+                    "$ref": "#/definitions/main.EpisodeStatus"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "to_status": {
+                    "$ref": "#/definitions/main.EpisodeStatus"
+                }
+            }
+        },
+        "main.EpisodeStatus": {
+            "type": "string",
+            "enum": [
+                "IDEA_BACKLOG",
+                "SCRIPT_DRAFT",
+                "SCRIPT_APPROVED",
+                "VO_GENERATED",
+                "MUSIC_GENERATED",
+                "ANIMATION_RENDERED",
+                "ASSEMBLED",
+                "QA_REVIEW",
+                "PLATFORM_ADAPTED",
+                "SCHEDULED",
+                "PUBLISHED",
+                "ANALYZED",
+                "CANCELLED",
+                "FAILED"
+            ],
+            "x-enum-varnames": [
+                "StatusIdeaBacklog",
+                "StatusScriptDraft",
+                "StatusScriptApproved",
+                "StatusVOGenerated",
+                "StatusMusicGenerated",
+                "StatusAnimationRendered",
+                "StatusAssembled",
+                "StatusQAReview",
+                "StatusPlatformAdapted",
+                "StatusScheduled",
+                "StatusPublished",
+                "StatusAnalyzed",
+                "StatusCancelled",
+                "StatusFailed"
+            ]
+        },
+        "main.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.FailRequest": {
+            "type": "object",
+            "properties": {
+                "error": {
+                    "type": "string"
+                },
+                "worker_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.Location": {
+            "type": "object",
+            "properties": {
+                "background_asset_url": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "used_for": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.PauseRequest": {
+            "type": "object",
+            "properties": {
+                "reason": {
+                    "type": "string"
+                },
+                "scope": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.PipelineControl": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "integer"
+                },
+                "paused": {
+                    "type": "boolean"
+                },
+                "paused_at": {
+                    "type": "string"
+                },
+                "paused_by": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "scope": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.PipelineOverview": {
+            "type": "object",
+            "properties": {
+                "awaiting_review": {
+                    "type": "integer"
+                },
+                "claimed_now": {
+                    "type": "integer"
+                },
+                "failed": {
+                    "type": "integer"
+                },
+                "in_flight": {
+                    "type": "integer"
+                },
+                "open_alerts": {
+                    "type": "integer"
+                },
+                "pause_reason": {
+                    "type": "string"
+                },
+                "paused": {
+                    "type": "boolean"
+                },
+                "paused_stages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "published_total": {
+                    "type": "integer"
+                },
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/main.StageCount"
+                    }
+                },
+                "stuck": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/main.Episode"
+                    }
+                }
+            }
+        },
+        "main.StageCount": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "type": "integer"
+                },
+                "paused": {
+                    "type": "boolean"
+                },
+                "status": {
+                    "$ref": "#/definitions/main.EpisodeStatus"
+                }
+            }
+        },
+        "main.StageInfo": {
+            "type": "object",
+            "properties": {
+                "layer": {
+                    "type": "string"
+                },
+                "next_statuses": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/main.EpisodeStatus"
+                    }
+                },
+                "owner_agent": {
+                    "type": "string"
+                },
+                "requires_gate": {
+                    "type": "string"
+                },
+                "status": {
+                    "$ref": "#/definitions/main.EpisodeStatus"
+                }
+            }
+        },
+        "main.TransitionRequest": {
+            "type": "object",
+            "properties": {
+                "actor": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "to_status": {
+                    "$ref": "#/definitions/main.EpisodeStatus"
+                },
+                "worker_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "main.WorkerRequest": {
+            "type": "object",
+            "properties": {
+                "worker_id": {
                     "type": "string"
                 }
             }
@@ -78,8 +2364,8 @@ var SwaggerInfo = &swag.Spec{
 	Host:             "localhost:8080",
 	BasePath:         "/",
 	Schemes:          []string{"http"},
-	Title:            "Book API",
-	Description:      "This is a sample server for a book API.",
+	Title:            "Pom Pom Hollow Production API",
+	Description:      "Orchestration backend for the automated short-form video pipeline, plus the original book sample endpoints.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",

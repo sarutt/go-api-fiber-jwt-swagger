@@ -1,10 +1,10 @@
 package main
 
 import (
-	"strconv"
 	"github.com/gofiber/fiber/v2"
-		
-	_"gitlhub.com/sarutt/apifiber/docs"
+	"strconv"
+
+	_ "gitlhub.com/sarutt/apifiber/docs"
 )
 
 type Book struct {
@@ -28,12 +28,11 @@ var books []Book = []Book{
 // @Security ApiKeyAuth
 // @Success 200 {array} Book
 // @Router /books [get]
-func getBooks(c *fiber.Ctx) error{
+func getBooks(c *fiber.Ctx) error {
 	return c.JSON(books)
 }
 
-
-func getBook(c *fiber.Ctx) error{
+func getBook(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
 		return c.SendStatus(fiber.StatusBadRequest)
@@ -99,4 +98,3 @@ func deleteBook(c *fiber.Ctx) error {
 
 	return c.SendStatus(fiber.StatusNotFound)
 }
-
