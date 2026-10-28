@@ -9,8 +9,8 @@
 
 ## 2. ข้อสมมติ (แก้ได้)
 - ผู้ใช้ต้องมีอีเมลหรือเบอร์โทรอย่างน้อยหนึ่งอย่าง ใช้ล็อกอิน
-- ดอกเบี้ยคงที่: ดอกเบี้ยรวม = เงินต้นที่ผ่อน x อัตราต่อปี x จำนวนเดือน / 12 (เงินต้นที่ผ่อน = ราคาผ่อน - เงินดาวน์) ค่างวด = (เงินต้น + ดอกเบี้ยรวม) / จำนวนงวด ปัดเศษขึ้นเป็นสตางค์ งวดสุดท้ายรับส่วนต่าง
-- ค่าดอกเบี้ย ค่าปรับ วันครบกำหนด เก็บในสัญญาแต่ละฉบับ (snapshot ณ วันสร้าง ไม่เปลี่ยนตามค่ากลาง)
+- ดอกเบี้ยคงที่ (flat) ตั้งค่าต่อสัญญาได้ว่าอัตราเป็น % ต่อปี หรือ % ต่อเดือน: ดอกเบี้ยรวม = เงินต้นที่ผ่อน x อัตรา x จำนวนเดือน (กรณีต่อเดือน) หรือ x จำนวนเดือน/12 (กรณีต่อปี) เงินต้นที่ผ่อน = ราคาผ่อน - เงินดาวน์ ค่างวด = (เงินต้น + ดอกเบี้ยรวม) / จำนวนงวด ปัดเศษขึ้นเป็นสตางค์ งวดสุดท้ายรับส่วนต่าง
+- ดอกเบี้ย ค่าปรับ วันครบกำหนด คอมมิชชัน เก็บในสัญญาแต่ละฉบับ (snapshot ณ วันสร้าง ไม่เปลี่ยนตามค่ากลาง)
 - ตารางงวดคำนวณและบันทึกเมื่อสัญญาได้รับอนุมัติ
 - ยอดขายนับเมื่อสัญญาอนุมัติแล้วเท่านั้น
 - เงินเก็บเป็นจำนวนเต็มสตางค์ (หรือ NUMERIC(14,2)) ไม่ใช้ float
@@ -52,8 +52,9 @@ internal/
 - `products` (id, sku UNIQUE, name, category_id, cash_price, installment_price, image_url, low_stock_threshold, is_active)
 - `stock_levels` (product_id PK, quantity CHECK >= 0)
 - `stock_movements` (id, product_id, type[receive|adjust|transfer|contract_out|contract_release], qty_delta, ref_type, ref_id, note, created_by, created_at)
-- `contracts` (id, contract_no, customer_id, sales_id, product_id, type[cash|installment], status, price, down_payment, interest_rate_pct_year, installments_count, installment_amount, billing_day, late_fee_enabled, late_fee_amount, approved_by, approved_at, reject_reason, created_at)
-- `installments` (id, contract_id, seq, due_date, amount_due, late_fee, amount_paid, status[pending|paid|overdue|waiting_review], paid_at)
+- `contracts` (id, contract_no, customer_id, sales_id, product_id, type[cash|installment], status, price, down_payment, interest_rate_pct, interest_rate_period[year|month], installments_count, installment_amount, billing_day, late_fee_mode[none|once|daily|rollover], late_fee_amount, approved_by, approved_at, reject_reason, settled_at, created_at)
+- `commissions` (id, contract_id UNIQUE, sales_id, rule_type[fixed|percent], rule_value, trigger[on_approval|on_full_payment], conditions jsonb, amount, status[pending|earned|cancelled], earned_at) — ตั้งเงื่อนไขแยกต่อยอดขายแต่ละรายการ
+- `installments` (id, contract_id, seq, due_date, amount_due, late_fee, amount_paid, status[pending|paid|overdue|waiting_review|settled_early], charge_attempts, next_charge_at, paid_at)
 - `payments` (id, contract_id, installment_id?, method[qr|card|transfer_slip|card_autocharge], amount, status[pending|succeeded|failed|rejected], gateway_ref, slip_id?, created_at)
 - `payment_slips` (id, payment_id, image_url, verification_status, verified_amount, raw_response)
 - `payment_methods` (id, customer_id, gateway_customer_ref, gateway_card_token, brand, last4, is_default)
@@ -66,21 +67,26 @@ internal/
 
 ## 6. สถานะสัญญา
 ```
-draft? -> pending_approval -> approved/active -> completed
+สัญญาผ่อน:  pending_approval -> active -> completed
                           \-> rejected (คืนสต็อก)
-active -> overdue (มีงวดค้าง) -> active (ชำระครบงวดที่ค้าง) | defaulted (เฟสถัดไป)
-active/pending_approval -> cancelled (คืนสต็อก, เฉพาะหัวหน้า)
+            active -> overdue (มีงวดค้าง) -> active (ชำระครบงวดที่ค้าง)
+            active/overdue -> completed (ปิดยอดก่อนกำหนด)
+สัญญาขายสด: pending_payment -> pending_approval -> completed
+                  \-> cancelled (จ่ายไม่สำเร็จ/หมดเวลา คืนสต็อก)   pending_approval -> rejected (คืนสต็อก + คืนเงิน)
+ทุกประเภท: pending_* -> cancelled (คืนสต็อก, เฉพาะหัวหน้า)
 ```
 - สร้างสัญญา: ใน transaction เดียว ตัดสต็อก (`UPDATE ... WHERE quantity >= 1`) + บันทึก movement `contract_out` + สถานะ `pending_approval`
 - ปฏิเสธ/ยกเลิก: ใน transaction เดียว คืนสต็อก + movement `contract_release`
-- อนุมัติ: สร้างตารางงวด (สัญญาผ่อน) หรืองวดเดียวเต็มจำนวน (ขายสด)
+- อนุมัติ (ผ่อน): สร้างตารางงวด; ขายสด: ลูกค้าต้องจ่ายเต็มจำนวนสำเร็จก่อนจึงเข้าสถานะ `pending_approval` แล้วหัวหน้าอนุมัติ -> `completed`
+- ขายสดที่หัวหน้าปฏิเสธหลังจ่ายเงินแล้ว ต้องมีขั้นตอนคืนเงิน (refund) ผ่าน gateway หรือบันทึกคืนเงินด้วยมือ
 
 ## 7. สถานะงวดและการชำระ
 - ชำระผ่าน QR/บัตร: gateway เรียก webhook ยืนยัน -> บันทึกชำระ (idempotent ด้วย `gateway_ref`)
 - โอนแนบสลิป: สร้าง payment `pending` -> ระบบตรวจสลิปอัตโนมัติ -> ผ่าน = `succeeded`, ไม่ผ่าน = `rejected` + แจ้งลูกค้า; ตรวจซ้ำสลิปเดิมไม่ได้ (กันสลิปซ้ำ)
-- ตัดบัตรอัตโนมัติ (job รายวัน): งวดถึง `due_date` ตัดด้วย token เริ่มต้น; ไม่ผ่าน -> งวด `overdue`, สัญญา `overdue`, แจ้งลูกค้าและหัวหน้า
-- ค่าปรับ: ถ้า `late_fee_enabled` เมื่องวดเกินกำหนดบวก `late_fee_amount` (ครั้งเดียวต่องวด — ข้อสมมติ)
-- การตัดเงิน ลองตัดซ้ำได้กี่ครั้ง/ห่างกี่วัน: ยังไม่กำหนด (ดูคำถามค้าง)
+- ตัดบัตรอัตโนมัติ (job รายวัน): งวดถึง `due_date` ตัดด้วย token เริ่มต้น; ไม่ผ่าน -> ลองใหม่อีก 1 ครั้งหลังผ่านไป 1 วัน (`charge_attempts`, `next_charge_at`; จำนวนครั้งและระยะห่างเป็นค่าตั้งได้ ค่าเริ่มต้น 1 ครั้ง / 1 วัน); ลองครั้งสุดท้ายไม่ผ่าน -> งวด `overdue`, สัญญา `overdue`, แจ้งลูกค้าและหัวหน้า
+- ค่าปรับ (`late_fee_mode` ต่อสัญญา): `none` ไม่คิด / `once` คิดครั้งเดียวต่องวดเมื่อเกินกำหนด / `daily` คิดวันละ `late_fee_amount` จนกว่าจะชำระ / `rollover` ยกยอดค่าปรับไปรวมกับยอดเรียกเก็บของงวดถัดไป
+- ปิดยอดก่อนกำหนด: ลูกค้า (หรือหัวหน้า) ขอยอดปิดบัญชี = ผลรวมงวดที่ยังไม่จ่าย + ค่าปรับค้าง ชำระผ่านช่องทางปกติ สำเร็จแล้วงวดที่เหลือเป็น `settled_early` สัญญา `completed` (ส่วนลดดอกเบี้ยเป็นค่าตั้งได้ ค่าเริ่มต้นไม่ลด — ข้อสมมติ)
+- คอมมิชชัน: สร้างระเบียนเมื่อสร้างสัญญาตามเงื่อนไขที่กำหนด เป็น `earned` เมื่อถึง `trigger` (อนุมัติ หรือชำระครบ) และเป็น `cancelled` ถ้าสัญญาถูกปฏิเสธ/ยกเลิก
 
 ## 8. API หลัก (REST, prefix `/api/v1`, ทั้งหมดอธิบายด้วย Swagger)
 - auth: `POST /auth/login`, `POST /auth/change-password`, `POST /auth/refresh`
@@ -88,26 +94,28 @@ active/pending_approval -> cancelled (คืนสต็อก, เฉพาะ�
 - catalog: `GET/POST/PUT /products`, `GET /categories`
 - inventory: `GET /inventory`, `POST /inventory/receive|adjust|transfer` (manager), `GET /inventory/movements`
 - contracts: `POST /contracts`, `GET /contracts`, `GET /contracts/{id}`, `POST /contracts/{id}/approve|reject|cancel` (manager)
+- settlement: `GET /contracts/{id}/payoff-quote`, `POST /contracts/{id}/payoff`
+- commissions: `GET /commissions` (sales เห็นของตัวเอง, manager เห็นทั้งหมด), `PUT /contracts/{id}/commission` (manager)
 - billing/me: `GET /me/contracts`, `GET /me/installments`, `GET /me/summary` (ยอดที่ต้องชำระ)
 - payments: `POST /payments/qr`, `POST /payments/card`, `POST /payments/slip`, `POST /webhooks/gateway`
 - cards: `GET/POST/DELETE /me/payment-methods`
 - notifications: `GET /me/notifications`, `PATCH /me/notifications/{id}/read`
 - settings: `GET/PUT /settings/notification-rules`, `GET/PUT /settings/defaults` (manager)
-- reports (manager): `GET /reports/sales-by-user`, `/reports/overdue`, `/reports/monthly-collection`, `/reports/low-stock`
+- reports (manager): `GET /reports/sales-by-user`, `/reports/overdue`, `/reports/monthly-collection`, `/reports/low-stock`, `/reports/commissions`
 
 ## 9. Background jobs
 | job | ความถี่ | หน้าที่ |
 |---|---|---|
 | reminders | รายวัน | สร้างแจ้งเตือนงวดที่ใกล้ครบกำหนดตาม `notification_rules` |
-| autocharge | รายวัน | ตัดบัตรงวดที่ครบกำหนด (idempotent ต่อ installment) |
-| overdue | รายวัน | เปลี่ยนงวด/สัญญาเป็นค้างชำระ + คิดค่าปรับ + แจ้งหัวหน้า |
+| autocharge | รายวัน | ตัดบัตรงวดที่ครบกำหนด + ลองใหม่ตาม `next_charge_at` (idempotent ต่อ installment) |
+| overdue | รายวัน | เปลี่ยนงวด/สัญญาเป็นค้างชำระ + คิดค่าปรับตามโหมด (daily/rollover) + แจ้งหัวหน้า |
 | mail-sender | ต่อเนื่อง | ส่งอีเมลจากคิว `notifications` |
 ทุก job ต้อง idempotent และใช้ advisory lock กันรันซ้อน
 
 ## 10. หน้าจอ (เว็บ)
 - ลูกค้า: ภาพรวมยอดค้าง, รายการสัญญา/งวด, ชำระเงิน (QR/บัตร/สลิป), จัดการบัตร, แจ้งเตือน, เปลี่ยนรหัสผ่าน
 - ลูกทีม: สินค้าคงเหลือ, สร้างลูกค้า, สร้างสัญญา, รายการสัญญาของฉัน
-- หัวหน้า: คิวอนุมัติสัญญา, คลังสินค้าและประวัติ, ทีม/ยอดขาย, รายงาน 4 รายการ, ตั้งค่า
+- หัวหน้า: คิวอนุมัติสัญญา, คลังสินค้าและประวัติ, ทีม/ยอดขาย, รายงาน 5 รายการ (รวมคอมมิชชัน), ตั้งค่า
 
 ## 11. ความปลอดภัย
 - รหัสผ่าน bcrypt/argon2, JWT อายุสั้น + refresh, rate limit ที่ล็อกอิน
@@ -124,10 +132,7 @@ active/pending_approval -> cancelled (คืนสต็อก, เฉพาะ�
 6. เว็บ frontend (ทำคู่ไปกับแต่ละเฟส)
 
 ## 13. คำถามที่ยังเปิดอยู่
-- ตัดบัตรไม่ผ่านจะลองใหม่กี่ครั้ง ห่างกันกี่วัน (ก่อนสถานะค้างชำระ)
-- ค่าปรับคิดครั้งเดียวต่องวด หรือคิดรายวัน
-- ดอกเบี้ยคงที่เป็นอัตรา % ต่อปีหรือต่อเดือน
-- ขายสด: จ่ายเต็มจำนวนครั้งเดียวเมื่อไร (ก่อน/หลังอนุมัติ)
-- ลูกค้าปิดยอดก่อนกำหนดได้ไหม (ส่วนลดดอกเบี้ย?)
-- คอมมิชชันของลูกทีม (นอกขอบเขตรอบแรกหรือไม่)
+- ขายสด: ถ้าลูกค้าสร้างสัญญาแล้วไม่จ่ายภายในเวลาที่กำหนด ให้ยกเลิกและคืนสต็อกอัตโนมัติภายในกี่ชั่วโมง/วัน (ข้อสมมติ: ตั้งค่าได้ ค่าเริ่มต้น 24 ชม.)
+- ปิดยอดก่อนกำหนด: มีส่วนลดดอกเบี้ยหรือไม่ (ข้อสมมติ: ไม่ลด)
+- คอมมิชชัน: ตัวอย่างเงื่อนไขที่ใช้จริง (เช่น % ของราคา, ยอดคงที่ต่อชิ้น, ขั้นบันได) เพื่อกำหนดรูปแบบ `conditions`
 - ผู้ให้บริการ gateway / ตรวจสลิป / อีเมลที่จะใช้
